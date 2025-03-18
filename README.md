@@ -1,0 +1,53 @@
+## Проект по автоматизации учёта времени
+
+Этот проект предназначен для автоматизации учёта времени, затраченного на выполнение задач в проектах. В системе есть две основные роли: **работник** и **администратор**.
+
+### Роли и возможности
+
+- **Администратор**:
+  - Добавление новых проектов, работников и типов задач.
+  - Редактирование проектов (изменение назначенных работников и задач).
+  - Формирование отчётов (в настоящее время не реализовано).
+
+- **Работник**:
+  - Внесение записей о потраченном времени на задачи в назначенных проектах.
+
+### Интерфейс
+
+Изначально взаимодействие происходит через команды в кнопках. Дальше все действия выполняются через кнопки в чате, за исключением выбора контакта в Telegram. Всегда доступна кнопка для отмены изменений.
+
+- **Администратор**:
+  - Редактирование и добавление новых сущностей через сообщения и чекбоксы.
+
+- **Работник**:
+  - Выбор проекта и задачи, затем ввод времени (в часах) через сообщение.
+
+### Схема базы данных
+
+![](https://img.plantuml.biz/plantuml/png/hLJDIiD04BxlKypHgds1d7hoqel7tahgBc4XYP1iJY9eBhqK117q8efFi8hHKZLzXTatSj9WcgHjqe2NmCxFztqptv11gEn0HPxBpbmx306VKUChfYR67vpZ0YxO4KXkWVGL79mEU_HKmXLEO7jZoS62YNGeHs5ym6zpOq6e0kaxMU0EK_p23q9ApRM9pQn8Nh8_lYTpHLK9BaoyZGiVISydlj4tqvEKuLyeiBH0-94d0bk94kezrR-ZDbFKdL2twXhLbuBp5IWkrpNZWk5aU0mv2sKhRPirE-ZMwlSZeb6ASVScgSqqQjtP3X5japO9xELNegbFMy0p3obmIt19ValyF9guAsCt3hFVFsnpYLMkwnyQIiQmohvQIZjhhxZHSOnQRxFCnbus43wdVyCl)
+
+### Схемы взаимодействия
+
+#### Схема с работником
+
+##### Внести время
+
+![](https://img.plantuml.biz/plantuml/png/fPB1IiD048RlUOeXf_QWuC6B1oc-IMXp26XRsjLpKn6H2g88daHzWnZIkgRDzXN-VIF_tTP2SmY2Xpti_3FV_BEpdR6AHkhouZo8kcem4hmZmoUCdQA2HXaCAIVTP1ZrbOHuT4eeqLZE1Ye8wjboSEg44y4hXGKo2Xfp5Zx3C3533csdzbwGsmdcMDc7q7LEhY8LUoQFezJ9H7vWpUAKe59GK4f9kcQmiZDx8rYJQCWiMMEGIujr5PRaVACIbBmOPfVGxGRZJtRcXSa-CFkhiI_A1GU_hTN_tywE3DrWveKHtzYckqVceImjxv5xi7UR23VZibowTbdUxwhH3XTeK8WpGThIprLjMsuPSdHut6vm-EO8lEU-uO8p_Phn8sxUKWUzUEzVTE9-Zz_q1m00)
+
+#### Схемы с администратором
+
+##### Добавление проекта
+
+![](https://img.plantuml.biz/plantuml/png/jLHDJi905Dxt52-iOC45N1ZYJHheeea2WT4rhGiaclWJ4rU6XHSO6mgLd-aLtjp8xqqWY9PaMBXesddp_VNDQrj35GxKzTLb4BPLRq3yn3DUSy4RBcnYKpjYRLCsTXJq0OpRSJ_iAghnCsffZS8XNVHK41pdKVDS86V4xwnvxie5vv1uPSEVg6MWfFQ1k0JBSCvBKQxp4cA6IznrG-B5Dw6Ad1qkaJrk2hStA3j1cn00cXSmqWxwU635ckesmGffx0IrZUHhUBtI2pGDp_uQL2gU6jjrgaI-tt4TTmNa5s-QF_fKUAQszsYyb7OEWLUsFG_lgW7KTaouhQewEfPdWQEId9fhhtzYC2cxnzGrVGdxx7yYLZdvjN6ALOxzxJ43PmJXVShQB-fK9XF5Z7Dipq7O3g9No0_XOTy0iTenIIQQx2r2br2zSv7Mv6Pz8UVbO4Nrz7UYWs-u5NKx-Ezy0m00)
+
+##### Редактирование проекта
+
+![](https://img.plantuml.biz/plantuml/png/jLNBJi9G4DttAoQi9C4VS668Vz882n8LejMrG0mQJNniT6FK-0CLAHOevHVc_f5dfaLQ1Bo-I1hIwSmvSyxSH_d0S_UzmzqTnztswll4LzpZY4CUSsYQfcMEsJSjZisnqq1YRRlMSFSyAl0rOgq2kGUqLVSSPtaThMzAoWRnFVlSrt380I0UEK2HpqE9e23chdmr5yGJVGtaKu7MU0ZOc2VuzulIQEt8zQfAZ4S8bjE3zmcLY09XI4YBDQ6DuDYScvCScVG0Fi4PeRC1ZzSpv67HIkUDEUSN3UMWVQjc7_0cjcWbcex4Pq0XGM3QvWn5Q7gCcgHMyUUee049_2QE2Wq79LBV9oL2r1VVJOT3H46ktROqJqL-szG9FWXEn47QKbUS7fbBIkNCJLaXB__IwHve1f87U40xZhlZqQebDkUFG_ZP2Bz5HJeSqdwxU5uvdaCKTMfFp2-OMP2m59N6IfhYzbPJEDMzofTAaxbRwyjucgLEK7HbBP-PjRWFZYbiHiaT54Q9OScaCklLMaLkUNu0O2GTsI923gUQzXtFcaedIToTYe0fCueLGZvjDRZx8q6BWFvDsiAkLUHlZZEavra7onUMBmSCzeBkxG10lSHGkpFY8LVQruCYbVcf1oj9pm8bzmWoHZCmx7F2yTn4hu4vrUQZ5QSVXulFXqerTx-LuJHkvtS0)
+
+##### Добавление типа задачи
+
+![](https://img.plantuml.biz/plantuml/png/fLFBJi905DtFLzomWWK_uC8G_wI1BaWg4AYkeIpKQE8Z9guCYVv0mHQBmFGNploHPyP2H21fOfEswPrpppdtqSOWzFhXnNcWl6ROxGiUa62536jaPcGYCqHi8cWpL3q2syrsp-k4Ki4ZOr55l86STKEbZkT9_TH2JWIlY35tuGmfAPwXCMLinfJ8t8axo0MVZ2N4NI6hI1LVvDJ8-OvhrcNxqWjzfyhRiX_NfkWBoN96j1a90J7PPtnQw7sXY7X7KwfcH45wCpT8BH9fhLI1JwJMIFPqbFA2KF2sLvwOCJkI2Wd7LimIOyPWQY8blCfK-4wXbEUQYEN6i43_OULvOSZgRWe_MAiV37mxBcQOMomE3QQqkmc_hBjY1iHfYn0tL6lgmphTsd4iI-eiiAx_7htmnTwwIb9o9JzBKtD6oWndifC-PyAsLSbs4Ol-SMJ_xJwc72xhpIbtxSfO7H0wjcr-fwLKoz_PzWQ3_56_0G00)
+
+##### Добавление сотрудника
+
+![](https://img.plantuml.biz/plantuml/png/lLHRQi9G4Fs_gnZyqWytq8yYNKCt43GK8JxGjDyQARHOw8D2lugKRY3QHA8rSGjpTzGpeuXQXKYXOaZkPERCcNDkRgNhEnt_kk4Pf-gtEiHF7F624quviNqRs1w7Dk3CzamRYVLglUqqVIhmCs91WPmkNRHyOuxNKVbSKiw8tpdagOOJZW7noXcF4PkW9B0FPFk2QNjs02pWy9p30XLnIv6vb6L9QDPl7D_LjhW4_dXpT7r3XoKYcUqJKXOSInefvWJN5sS7ErDHeaBHtgzgE2xbclD5SQEjRgSJZO3m3RLIMOfY_qBuLrUJY_a7p4cq-LmnD660O6g7zfP0BiDZWFdcKiCJml_IzTohZjFODpWNOJl4pf7G7dPeZEFvmcXF7YX6gonnXUermhifjY5Q34GldNU2O6m3G_Zb6VmJmiMgsWAwhJKdzMSRLOqBzMroWdMkrtNbgq4rvfqTgCnDT8IL45tlB-GfKfvDfOZVe3_ZjBnj5U66NQC3ni2DLfznIKdbSN6qKpv5mKR1Q7Cqh6MrZtysXSVm73CkqUvEnrWSQ7IQGysQCJLtvqog82ZdwGy0)
