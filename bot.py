@@ -4,18 +4,18 @@ import logging
 
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-
-from database import Database
-
-db = Database()
-
-from aiogram import Bot, Dispatcher
+from aiogram.filters import Command
+from aiogram_dialog import setup_dialogs, DialogManager, StartMode
 from dotenv import load_dotenv
-from handlers import admin, worker, common
+
+
+from dialogs.create_project import create_project_dialog, CreateProjectState
+from dialogs.db_middleware import DatabaseMiddleware
 
 load_dotenv()
-# Telegram Bot Token
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+from aiogram import Bot, Dispatcher, types
 
 bot = Bot(
     token=BOT_TOKEN,
@@ -23,15 +23,24 @@ bot = Bot(
         parse_mode=ParseMode.HTML
     )
 )
+
 dp = Dispatcher()
 
-logging.basicConfig(level=logging.INFO)
+from database import Database
 
+db = Database()
+# db.drop_all_tables()
+db.create_tables()
+
+from admin import admin_router
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S')
 
 async def main():
-    dp.include_router(admin.admin_router)
-    dp.include_router(worker.worker_router)
-    dp.include_router(common.common_router)
+    dp.update.outer_middleware(DatabaseMiddleware(db))
+    dp.include_router(admin_router)
+    setup_dialogs(dp)
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)

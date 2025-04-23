@@ -1,4 +1,6 @@
 import os
+from typing import Optional
+
 import psycopg2
 from psycopg2.extras import DictCursor
 from enum import Enum
@@ -14,9 +16,32 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 
 class ProjectType(Enum):
+    PLANNED = "плановый"
     CLIENT = "клиентский"
-    PROJECT = "проектный"
+    CUSTOM = "кастом"
     NONPROJECT = "непроектный"
+
+
+class Status(Enum):
+    IN_PROGRESS = "в работе"
+    COMPLETED = "завершён"
+    ON_HOLD = "на паузе"
+    CANCELLED = "отменен"
+
+
+class DepartmentType(Enum):
+    FONT = "шрифтовой"
+    TECHNICAL = "технический"
+    GRAPHIC = "графический"
+
+
+class Stage(Enum):
+    PREPARATION = "подготовка"
+    DRAWING_STRAIGHT = "отрисовка прямые"
+    DRAWING_ITALIC = "отрисовка италики"
+    DRAWING_CAPITAL = "отрисовка капитель"
+    TECHNICAL = "техничка"
+    FORMATTING = "оформление"
 
 
 class Database:
@@ -27,76 +52,137 @@ class Database:
             user=DB_USER,
             password=DB_PASSWORD
         )
-        # self.clear_database()
-        self.create_tables()
 
-    def clear_database(self):
+    def drop_all_tables(self):
+        """Удаление всех таблиц в базе данных."""
         with self.conn.cursor() as cursor:
-            tables = [
-                "worker",
-                "project",
-                "task",
-                "project_worker",
-                "project_task",
-                "time_entry"
-            ]
-
-            for table in tables:
-                cursor.execute(f"""
-                    DROP TABLE IF EXISTS {table} CASCADE;
+            try:
+                # Получение списка таблиц
+                cursor.execute("""
+                    SELECT 'DROP TABLE IF EXISTS ' || n.nspname || '.' || c.relname || ' CASCADE;'
+                    FROM pg_catalog.pg_class AS c
+                    LEFT JOIN pg_catalog.pg_namespace AS n
+                    ON n.oid = c.relnamespace
+                    WHERE relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'pg_toast')
+                    AND pg_catalog.pg_table_is_visible(c.oid);
                 """)
-            self.conn.commit()
+                drop_queries = cursor.fetchall()
+
+                # Выполнение запросов удаления таблиц
+                for query in drop_queries:
+                    cursor.execute(query[0])
+                self.conn.commit()
+                print("Все таблицы успешно удалены.")
+            except Exception as e:
+                self.conn.rollback()
+                print(f"Ошибка при удалении таблиц: {e}")
 
     def create_tables(self):
+        """Создание всех таблиц."""
         with self.conn.cursor() as cursor:
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS worker (
-                    id SERIAL PRIMARY KEY,
-                    telegram_id BIGINT UNIQUE,
-                    name VARCHAR(255) NOT NULL,
-                    position VARCHAR(255)
-                );
+            cursor.execute("BEGIN;")
+            try:
+                self.create_position_table(cursor)
+                self.create_worker_table(cursor)
+                self.create_project_table(cursor)
+                self.create_task_table(cursor)
+                self.create_project_worker_table(cursor)
+                self.create_project_task_table(cursor)
+                self.create_time_entry_table(cursor)
+                cursor.execute("COMMIT;")
+            except Exception as e:
+                cursor.execute("ROLLBACK;")
+                print(f"Ошибка при создании таблиц: {e}")
 
-                CREATE TABLE IF NOT EXISTS project (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    type VARCHAR(20) NOT NULL
-                );
+    def create_worker_table(self, cursor):
+        """Создание таблицы worker."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS worker (
+                id SERIAL PRIMARY KEY,
+                telegram_id BIGINT UNIQUE,
+                name TEXT NOT NULL,
+                position_id INTEGER REFERENCES position(id),
+                weekly_hours INTEGER CHECK (weekly_hours >= 0),
+                can_receive_custom_tasks BOOLEAN DEFAULT FALSE,
+                can_receive_non_project_tasks BOOLEAN DEFAULT FALSE
+            );
+        """)
 
-                CREATE TABLE IF NOT EXISTS task (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL UNIQUE
-                );
+    def create_position_table(self, cursor):
+        """Создание таблицы position."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS position (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                department_type TEXT NOT NULL CHECK (department_type IN ('шрифтовой', 'технический', 'графический')),
+                UNIQUE (name, department_type)
+            );
+        """)
 
-                CREATE TABLE IF NOT EXISTS project_worker (
-                    project_id INTEGER REFERENCES project(id),
-                    worker_id INTEGER REFERENCES worker(id),
-                    PRIMARY KEY (project_id, worker_id)
-                );
+    def create_project_table(self, cursor):
+        """Создание таблицы project."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS project (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                type TEXT NOT NULL CHECK (type IN ('плановый', 'клиентский', 'кастом', 'непроектный')),
+                status TEXT NOT NULL DEFAULT 'в работе' CHECK (status IN ('в работе', 'завершён', 'на паузе', 'отменен'))
+            );
+        """)
 
-                CREATE TABLE IF NOT EXISTS project_task (
-                    project_id INTEGER REFERENCES project(id),
-                    task_id INTEGER REFERENCES task(id),
-                    PRIMARY KEY (project_id, task_id)
-                );
+    def create_task_table(self, cursor):
+        """Создание таблицы task."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                stage TEXT NULL,
+                department_type TEXT NULL,
+                is_unique BOOLEAN NOT NULL DEFAULT FALSE
+            );
+        """)
 
-                CREATE TABLE IF NOT EXISTS time_entry (
-                    id SERIAL PRIMARY KEY,
-                    project_id INTEGER NOT NULL REFERENCES project(id),
-                    worker_id INTEGER NOT NULL REFERENCES worker(id),
-                    task_id INTEGER NOT NULL REFERENCES task(id),
-                    entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
-                    hours DOUBLE PRECISION NOT NULL
-                );
-            """)
-            self.conn.commit()
+    def create_project_worker_table(self, cursor):
+        """Создание таблицы project_worker."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS project_worker (
+                project_id INTEGER REFERENCES project(id),
+                worker_id INTEGER REFERENCES worker(id),
+                PRIMARY KEY (project_id, worker_id)
+            );
+        """)
+
+    def create_project_task_table(self, cursor):
+        """Создание таблицы project_task."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS project_task (
+                project_id INTEGER REFERENCES project(id),
+                task_id INTEGER REFERENCES task(id),
+                comments TEXT,
+                PRIMARY KEY (project_id, task_id)
+            );
+        """)
+
+    def create_time_entry_table(self, cursor):
+        """Создание таблицы time_entry."""
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS time_entry (
+                id SERIAL PRIMARY KEY,
+                project_id INTEGER NOT NULL REFERENCES project(id),
+                worker_id INTEGER NOT NULL REFERENCES worker(id),
+                task_id INTEGER NOT NULL REFERENCES task(id),
+                entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                hours DOUBLE PRECISION NOT NULL CHECK (hours > 0)
+            );
+        """)
 
     # Worker methods
-    def create_worker(self, name, position, telegram_id):
+    def create_worker(self, name, telegram_id, position_id, weekly_hours, can_receive_custom_tasks=False,
+                      can_receive_non_project_tasks=False):
         with self.conn.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO worker (name, position, telegram_id) VALUES (%s, %s, %s) RETURNING id",
-                (name, position, telegram_id)
+                "INSERT INTO worker (name, telegram_id, position_id, weekly_hours, can_receive_custom_tasks, can_receive_non_project_tasks) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                (name, telegram_id, position_id, weekly_hours, can_receive_custom_tasks, can_receive_non_project_tasks)
             )
             worker_id = cursor.fetchone()[0]
             self.conn.commit()
@@ -104,18 +190,83 @@ class Database:
 
     def get_worker(self, worker_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""
+                SELECT w.id, w.telegram_id, w.name, p.name AS position_name, w.weekly_hours, w.can_receive_custom_tasks, w.can_receive_non_project_tasks
+                FROM worker w
+                LEFT JOIN position p ON w.position_id = p.id
+                WHERE w.id = %s
+            """, (worker_id,))
+            worker = cursor.fetchone()
+            return dict(worker) if worker else None
+
+    def update_worker(self, worker_id, name=None, position_id=None, weekly_hours=None, can_receive_custom_tasks=None,
+                      can_receive_non_project_tasks=None):
+        with self.conn.cursor() as cursor:
+            query = "UPDATE worker SET "
+            updates = []
+            params = []
+
+            if name:
+                updates.append("name = %s")
+                params.append(name)
+            if position_id:
+                updates.append("position_id = %s")
+                params.append(position_id)
+            if weekly_hours:
+                updates.append("weekly_hours = %s")
+                params.append(weekly_hours)
+            if can_receive_custom_tasks is not None:
+                updates.append("can_receive_custom_tasks = %s")
+                params.append(can_receive_custom_tasks)
+            if can_receive_non_project_tasks is not None:
+                updates.append("can_receive_non_project_tasks = %s")
+                params.append(can_receive_non_project_tasks)
+
+            query += ", ".join(updates)
+            query += " WHERE id = %s"
+            params.append(worker_id)
+
+            cursor.execute(query, params)
+            self.conn.commit()
+
+    # Position methods
+
+    def create_position(self, name, department_type):
+        with self.conn.cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM worker WHERE id = %s",
-                (worker_id,)
+                "INSERT INTO position (name, department_type) VALUES (%s, %s) RETURNING id",
+                (name, department_type)
+            )
+            position_id = cursor.fetchone()[0]
+            self.conn.commit()
+            return position_id
+
+    def get_position(self, position_id):
+        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute(
+                "SELECT * FROM position WHERE id = %s",
+                (position_id,)
             )
             return cursor.fetchone()
 
-    # Project methods
-    def create_project(self, name, project_type, task_ids, worker_ids):
+    def get_all_positions(self):
+        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("SELECT * FROM position")
+            return cursor.fetchall()
+
+    def get_positions_by_department_type(self, department_type):
         with self.conn.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO project (name, type) VALUES (%s, %s) RETURNING id",
-                (name, project_type.value)
+                "SELECT position FROM positions WHERE department_type = %s", (department_type,)
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    # Project methods
+    def create_project(self, name, project_type, task_ids, worker_ids, status=Status.IN_PROGRESS.value):
+        with self.conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO project (name, type, status) VALUES (%s, %s, %s) RETURNING id",
+                (name, project_type, status)
             )
             project_id = cursor.fetchone()[0]
 
@@ -134,7 +285,8 @@ class Database:
             self.conn.commit()
             return project_id
 
-    def update_project(self, project_id, new_name=None, new_type=None, new_tasks=None, new_workers=None):
+    def update_project(self, project_id, new_name=None, new_type=None, new_tasks=None, new_workers=None,
+                       new_status=None):
         with self.conn.cursor() as cursor:
             if new_name:
                 cursor.execute(
@@ -145,7 +297,13 @@ class Database:
             if new_type:
                 cursor.execute(
                     "UPDATE project SET type = %s WHERE id = %s",
-                    (new_type.value, project_id)
+                    (new_type, project_id)
+                )
+
+            if new_status:
+                cursor.execute(
+                    "UPDATE project SET status = %s WHERE id = %s",
+                    (new_status, project_id)
                 )
 
             if new_tasks is not None:
@@ -181,12 +339,15 @@ class Database:
             return cursor.fetchone()
 
     # Task methods
-    def create_task(self, name):
+    def create_task(self, name, stage, department_type, is_unique=False):
         with self.conn.cursor() as cursor:
+            stage = None if stage == "None" or stage is None else stage
+            department_type = None if department_type == "None" or department_type is None else department_type
+
             cursor.execute(
-                "INSERT INTO task (name) VALUES (%s) RETURNING id",
-                (name,)
-            )
+                """INSERT INTO task (name, stage, department_type, is_unique) 
+                VALUES (%s, %s, %s, %s) RETURNING id""",
+                (name, stage, department_type, is_unique))
             task_id = cursor.fetchone()[0]
             self.conn.commit()
             return task_id
@@ -194,7 +355,7 @@ class Database:
     def get_task(self, task_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute(
-                "SELECT * FROM task WHERE id = %s",
+                "SELECT id, name, stage, department_type, is_unique FROM task WHERE id = %s",
                 (task_id,)
             )
             return cursor.fetchone()
@@ -286,9 +447,12 @@ class Database:
 
     def get_all_workers(self):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
-            cursor.execute(
-                "SELECT * FROM worker"
-            )
+            cursor.execute("""
+                SELECT w.*, p.name as position_name
+                FROM worker w
+                LEFT JOIN position p ON w.position_id = p.id
+                ORDER BY w.name
+            """)
             return cursor.fetchall()
 
     def get_all_projects(self):
@@ -327,3 +491,21 @@ class Database:
             )
             task_names = [row['name'] for row in cursor.fetchall()]
         return task_names
+
+    def get_tasks_by_stage(self, stage: str):
+        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""
+                SELECT t.id, t.name, t.stage, t.department_type
+                FROM task t
+                WHERE t.stage IS NOT DISTINCT FROM %s
+                ORDER BY t.name
+            """, (stage,))
+            return cursor.fetchall()
+
+    def add_task_to_project(self, project_id, task_id):
+        with self.conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO project_task (project_id, task_id) VALUES (%s, %s)",
+                (project_id, task_id)
+            )
+            self.conn.commit()
