@@ -1,6 +1,5 @@
 import os
-from typing import Optional
-
+from typing import Optional, List
 import psycopg2
 from psycopg2.extras import DictCursor
 from enum import Enum
@@ -54,10 +53,8 @@ class Database:
         )
 
     def drop_all_tables(self):
-        """Удаление всех таблиц в базе данных."""
         with self.conn.cursor() as cursor:
             try:
-                # Получение списка таблиц
                 cursor.execute("""
                     SELECT 'DROP TABLE IF EXISTS ' || n.nspname || '.' || c.relname || ' CASCADE;'
                     FROM pg_catalog.pg_class AS c
@@ -68,7 +65,6 @@ class Database:
                 """)
                 drop_queries = cursor.fetchall()
 
-                # Выполнение запросов удаления таблиц
                 for query in drop_queries:
                     cursor.execute(query[0])
                 self.conn.commit()
@@ -78,15 +74,14 @@ class Database:
                 print(f"Ошибка при удалении таблиц: {e}")
 
     def create_tables(self):
-        """Создание всех таблиц."""
         with self.conn.cursor() as cursor:
             cursor.execute("BEGIN;")
             try:
                 self.create_position_table(cursor)
+                self.create_font_table(cursor)
                 self.create_worker_table(cursor)
                 self.create_project_table(cursor)
                 self.create_task_table(cursor)
-                self.create_project_worker_table(cursor)
                 self.create_project_task_table(cursor)
                 self.create_time_entry_table(cursor)
                 cursor.execute("COMMIT;")
@@ -95,7 +90,6 @@ class Database:
                 print(f"Ошибка при создании таблиц: {e}")
 
     def create_worker_table(self, cursor):
-        """Создание таблицы worker."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS worker (
                 id SERIAL PRIMARY KEY,
@@ -108,8 +102,15 @@ class Database:
             );
         """)
 
+    def create_font_table(self, cursor):
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS font (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE
+            );
+        """)
+
     def create_position_table(self, cursor):
-        """Создание таблицы position."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS position (
                 id SERIAL PRIMARY KEY,
@@ -120,7 +121,6 @@ class Database:
         """)
 
     def create_project_table(self, cursor):
-        """Создание таблицы project."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS project (
                 id SERIAL PRIMARY KEY,
@@ -131,7 +131,6 @@ class Database:
         """)
 
     def create_task_table(self, cursor):
-        """Создание таблицы task."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS task (
                 id SERIAL PRIMARY KEY,
@@ -142,29 +141,18 @@ class Database:
             );
         """)
 
-    def create_project_worker_table(self, cursor):
-        """Создание таблицы project_worker."""
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS project_worker (
-                project_id INTEGER REFERENCES project(id),
-                worker_id INTEGER REFERENCES worker(id),
-                PRIMARY KEY (project_id, worker_id)
-            );
-        """)
-
     def create_project_task_table(self, cursor):
-        """Создание таблицы project_task."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS project_task (
                 project_id INTEGER REFERENCES project(id),
                 task_id INTEGER REFERENCES task(id),
+                font_id INTEGER REFERENCES font(id),
                 comments TEXT,
-                PRIMARY KEY (project_id, task_id)
+                PRIMARY KEY (project_id, task_id, font_id)
             );
         """)
 
     def create_time_entry_table(self, cursor):
-        """Создание таблицы time_entry."""
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS time_entry (
                 id SERIAL PRIMARY KEY,
@@ -191,7 +179,8 @@ class Database:
     def get_worker(self, worker_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute("""
-                SELECT w.id, w.telegram_id, w.name, p.name AS position_name, w.weekly_hours, w.can_receive_custom_tasks, w.can_receive_non_project_tasks
+                SELECT w.id, w.telegram_id, w.name, p.name AS position_name, w.weekly_hours, 
+                       w.can_receive_custom_tasks, w.can_receive_non_project_tasks
                 FROM worker w
                 LEFT JOIN position p ON w.position_id = p.id
                 WHERE w.id = %s
@@ -230,7 +219,6 @@ class Database:
             self.conn.commit()
 
     # Position methods
-
     def create_position(self, name, department_type):
         with self.conn.cursor() as cursor:
             cursor.execute(
@@ -255,80 +243,140 @@ class Database:
             return cursor.fetchall()
 
     def get_positions_by_department_type(self, department_type):
-        with self.conn.cursor() as cursor:
+        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute(
-                "SELECT position FROM positions WHERE department_type = %s", (department_type,)
+                "SELECT * FROM position WHERE department_type = %s", (department_type,)
             )
-            return [row[0] for row in cursor.fetchall()]
+            return cursor.fetchall()
 
     # Project methods
-    def create_project(self, name, project_type, task_ids, worker_ids, status=Status.IN_PROGRESS.value):
+    def create_project(self, name: str, project_type: str, tasks_with_fonts: List[dict] = None,
+                       status: str = Status.IN_PROGRESS.value) -> int:
+        #TODO Add custom tasks
+        """Создает новый проект с возможностью привязки задач к шрифтам по имени шрифта.
+
+        Args:
+            name: Название проекта
+            project_type: Тип проекта (из ProjectType)
+            tasks_with_fonts: Список словарей вида [{
+                'task_id': int,
+                'font_name': Optional[str],
+                'comments': Optional[str]
+            }]
+            status: Статус проекта (из Status)
+
+        Returns:
+            ID созданного проекта
+        """
+        print(tasks_with_fonts)
         with self.conn.cursor() as cursor:
-            cursor.execute(
-                "INSERT INTO project (name, type, status) VALUES (%s, %s, %s) RETURNING id",
-                (name, project_type, status)
-            )
-            project_id = cursor.fetchone()[0]
-
-            for task_id in task_ids:
+            try:
                 cursor.execute(
-                    "INSERT INTO project_task (project_id, task_id) VALUES (%s, %s)",
-                    (project_id, task_id)
-                )
+                    "INSERT INTO project (name, type, status) VALUES (%s, %s, %s) RETURNING id",
+                    (name, project_type, status))
+                project_id = cursor.fetchone()[0]
 
-            for worker_id in worker_ids:
-                cursor.execute(
-                    "INSERT INTO project_worker (project_id, worker_id) VALUES (%s, %s)",
-                    (project_id, worker_id)
-                )
+                if tasks_with_fonts:
+                    font_names = {task['font_name'] for task in tasks_with_fonts
+                                  if task.get('font_name') is not None}
 
-            self.conn.commit()
-            return project_id
+                    font_name_to_id = {}
+                    for font_name in font_names:
+                        cursor.execute(
+                            "SELECT id FROM font WHERE name = %s",
+                            (font_name,))
+                    font_row = cursor.fetchone()
 
-    def update_project(self, project_id, new_name=None, new_type=None, new_tasks=None, new_workers=None,
-                       new_status=None):
-        with self.conn.cursor() as cursor:
-            if new_name:
-                cursor.execute(
-                    "UPDATE project SET name = %s WHERE id = %s",
-                    (new_name, project_id)
-                )
+                    if font_row:
+                        font_id = font_row[0]
+                    else:
+                        cursor.execute(
+                            "INSERT INTO font (name) VALUES (%s) RETURNING id",
+                            (font_name,))
+                        font_id = cursor.fetchone()[0]
 
-            if new_type:
-                cursor.execute(
-                    "UPDATE project SET type = %s WHERE id = %s",
-                    (new_type, project_id)
-                )
+                    font_name_to_id[font_name] = font_id
 
-            if new_status:
-                cursor.execute(
-                    "UPDATE project SET status = %s WHERE id = %s",
-                    (new_status, project_id)
-                )
+                for task_info in tasks_with_fonts:
+                    font_id = None
+                    if task_info.get('font_name') is not None:
+                        font_id = font_name_to_id.get(task_info['font_name'])
 
-            if new_tasks is not None:
-                cursor.execute(
-                    "DELETE FROM project_task WHERE project_id = %s",
-                    (project_id,)
-                )
-                for task_id in new_tasks:
                     cursor.execute(
-                        "INSERT INTO project_task (project_id, task_id) VALUES (%s, %s)",
-                        (project_id, task_id)
+                        """INSERT INTO project_task 
+                        (project_id, task_id, font_id, comments) 
+                        VALUES (%s, %s, %s, %s)""",
+                        (project_id,
+                         task_info['task_id'],
+                         font_id,
+                         task_info.get('comments'))
                     )
 
-            if new_workers is not None:
-                cursor.execute(
-                    "DELETE FROM project_worker WHERE project_id = %s",
-                    (project_id,)
-                )
-                for worker_id in new_workers:
+                self.conn.commit()
+                return project_id
+            except Exception as e:
+                self.conn.rollback()
+                raise Exception(f"Ошибка при создании проекта: {e}")
+
+    def update_project(self, project_id: int, new_name: Optional[str] = None,
+                       new_type: Optional[str] = None, new_status: Optional[str] = None,
+                       tasks_with_fonts: Optional[List[dict]] = None) -> None:
+        """Обновляет информацию о проекте, включая привязки задач к шрифтам.
+
+        Args:
+            project_id: ID проекта для обновления
+            new_name: Новое название проекта (если нужно изменить)
+            new_type: Новый тип проекта (если нужно изменить)
+            new_status: Новый статус проекта (если нужно изменить)
+            tasks_with_fonts: Список словарей с задачами и шрифтами:
+                [{'task_id': int, 'font_id': Optional[int], 'comments': Optional[str]}]
+                Если None - связи задач не изменяются.
+                Если пустой список - все связи удаляются.
+                Если список с задачами - заменяет текущие связи.
+        """
+        with self.conn.cursor() as cursor:
+            try:
+                # Обновляем основную информацию о проекте
+                updates = []
+                params = []
+
+                if new_name is not None:
+                    updates.append("name = %s")
+                    params.append(new_name)
+                if new_type is not None:
+                    updates.append("type = %s")
+                    params.append(new_type)
+                if new_status is not None:
+                    updates.append("status = %s")
+                    params.append(new_status)
+
+                if updates:
+                    update_query = "UPDATE project SET " + ", ".join(updates) + " WHERE id = %s"
+                    params.append(project_id)
+                    cursor.execute(update_query, params)
+
+                if tasks_with_fonts is not None:
                     cursor.execute(
-                        "INSERT INTO project_worker (project_id, worker_id) VALUES (%s, %s)",
-                        (project_id, worker_id)
+                        "DELETE FROM project_task WHERE project_id = %s",
+                        (project_id,)
                     )
 
-            self.conn.commit()
+                    if tasks_with_fonts:
+                        for task_info in tasks_with_fonts:
+                            cursor.execute(
+                                """INSERT INTO project_task 
+                                (project_id, task_id, font_id, comments) 
+                                VALUES (%s, %s, %s, %s)""",
+                                (project_id,
+                                 task_info['task_id'],
+                                 task_info.get('font_id'),
+                                 task_info.get('comments'))
+                            )
+
+                self.conn.commit()
+            except Exception as e:
+                self.conn.rollback()
+                raise Exception(f"Ошибка при обновлении проекта: {e}")
 
     def get_project(self, project_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
@@ -337,6 +385,47 @@ class Database:
                 (project_id,)
             )
             return cursor.fetchone()
+
+    def get_project_with_tasks_and_fonts(self, project_id: int) -> Optional[dict]:
+        """Возвращает полную информацию о проекте, включая задачи с привязанными шрифтами."""
+        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+            try:
+                # Получаем основную информацию о проекте
+                cursor.execute(
+                    "SELECT * FROM project WHERE id = %s",
+                    (project_id,)
+                )
+                project = cursor.fetchone()
+
+                if not project:
+                    return None
+
+                # Получаем все задачи проекта с информацией о шрифтах
+                cursor.execute("""
+                    SELECT 
+                        t.id as task_id, 
+                        t.name as task_name, 
+                        t.stage, 
+                        t.department_type,
+                        t.is_unique,
+                        f.id as font_id, 
+                        f.name as font_name, 
+                        pt.comments
+                    FROM project_task pt
+                    JOIN task t ON pt.task_id = t.id
+                    LEFT JOIN font f ON pt.font_id = f.id
+                    WHERE pt.project_id = %s
+                    ORDER BY t.name
+                """, (project_id,))
+
+                tasks = cursor.fetchall()
+
+                return {
+                    'project': dict(project),
+                    'tasks': [dict(task) for task in tasks]
+                }
+            except Exception as e:
+                raise Exception(f"Ошибка при получении информации о проекте: {e}")
 
     # Task methods
     def create_task(self, name, stage, department_type, is_unique=False):
@@ -359,6 +448,32 @@ class Database:
                 (task_id,)
             )
             return cursor.fetchone()
+
+    def update_task(self, task_id, name=None, stage=None, department_type=None, is_unique=None):
+        with self.conn.cursor() as cursor:
+            query = "UPDATE task SET "
+            updates = []
+            params = []
+
+            if name:
+                updates.append("name = %s")
+                params.append(name)
+            if stage is not None:
+                updates.append("stage = %s")
+                params.append(stage)
+            if department_type is not None:
+                updates.append("department_type = %s")
+                params.append(department_type)
+            if is_unique is not None:
+                updates.append("is_unique = %s")
+                params.append(is_unique)
+
+            query += ", ".join(updates)
+            query += " WHERE id = %s"
+            params.append(task_id)
+
+            cursor.execute(query, params)
+            self.conn.commit()
 
     # Time entry methods
     def add_time_entry(self, project_id, worker_id, task_id, hours, entry_date=None):
@@ -387,34 +502,72 @@ class Database:
                 )
             return cursor.fetchall()
 
-    # Getter methods
-    def get_worker_projects(self, worker_id):
+    def get_time_entries_by_project(self, project_id):
+        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""
+                SELECT te.*, w.name as worker_name, t.name as task_name
+                FROM time_entry te
+                JOIN worker w ON te.worker_id = w.id
+                JOIN task t ON te.task_id = t.id
+                WHERE te.project_id = %s
+                ORDER BY te.entry_date DESC
+            """, (project_id,))
+            return cursor.fetchall()
+
+    # Font methods
+    def create_font(self, name):
+        with self.conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO font (name) VALUES (%s) RETURNING id",
+                (name,)
+            )
+            font_id = cursor.fetchone()[0]
+            self.conn.commit()
+            return font_id
+
+    def get_font(self, font_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute(
-                """SELECT p.* FROM project p
-                JOIN project_worker pw ON p.id = pw.project_id
-                WHERE pw.worker_id = %s""",
-                (worker_id,)
+                "SELECT * FROM font WHERE id = %s",
+                (font_id,)
             )
+            return cursor.fetchone()
+
+    def get_all_fonts(self):
+        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("SELECT * FROM font ORDER BY name")
+            return cursor.fetchall()
+
+    # Other methods
+    def get_worker_projects(self, worker_id):
+        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""
+                SELECT DISTINCT p.*
+                FROM project p
+                JOIN time_entry te ON p.id = te.project_id
+                WHERE te.worker_id = %s
+                ORDER BY p.name
+            """, (worker_id,))
             return cursor.fetchall()
 
     def get_worker_project_tasks(self, worker_id, project_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
-            cursor.execute(
-                """SELECT t.* FROM task t
-                JOIN project_task pt ON t.id = pt.task_id
-                JOIN project p ON pt.project_id = p.id
-                JOIN project_worker pw ON p.id = pw.project_id
-                WHERE pw.worker_id = %s AND p.id = %s""",
-                (worker_id, project_id)
-            )
+            cursor.execute("""
+                SELECT DISTINCT t.*
+                FROM task t
+                JOIN time_entry te ON t.id = te.task_id
+                WHERE te.worker_id = %s AND te.project_id = %s
+                ORDER BY t.name
+            """, (worker_id, project_id))
             return cursor.fetchall()
 
     def get_project_tasks(self, project_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute(
-                """SELECT t.* FROM task t
+                """SELECT t.*, f.id as font_id, f.name as font_name, pt.comments 
+                FROM task t
                 JOIN project_task pt ON t.id = pt.task_id
+                LEFT JOIN font f ON pt.font_id = f.id
                 WHERE pt.project_id = %s""",
                 (project_id,)
             )
@@ -422,12 +575,14 @@ class Database:
 
     def get_project_workers(self, project_id):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
-            cursor.execute(
-                """SELECT w.* FROM worker w
-                JOIN project_worker pw ON w.id = pw.worker_id
-                WHERE pw.project_id = %s""",
-                (project_id,)
-            )
+            cursor.execute("""
+                SELECT DISTINCT w.*, p.name as position_name
+                FROM worker w
+                JOIN position p ON w.position_id = p.id
+                JOIN time_entry te ON w.id = te.worker_id
+                WHERE te.project_id = %s
+                ORDER BY w.name
+            """, (project_id,))
             return cursor.fetchall()
 
     def get_task_by_name(self, task_name):
@@ -441,7 +596,7 @@ class Database:
     def get_all_tasks(self):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute(
-                "SELECT * FROM task"
+                "SELECT * FROM task ORDER BY name"
             )
             return cursor.fetchall()
 
@@ -458,7 +613,7 @@ class Database:
     def get_all_projects(self):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute(
-                "SELECT * FROM project",
+                "SELECT * FROM project ORDER BY name",
             )
             return cursor.fetchall()
 
@@ -474,23 +629,21 @@ class Database:
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute(
                 """
-                SELECT name FROM worker WHERE id IN %s
+                SELECT id, name FROM worker WHERE id IN %s
                 """,
                 (tuple(worker_ids),)
             )
-            worker_names = [row['name'] for row in cursor.fetchall()]
-        return worker_names
+            return {row['id']: row['name'] for row in cursor.fetchall()}
 
     def get_task_names(self, task_ids):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute(
                 """
-                SELECT name FROM task WHERE id IN %s
+                SELECT id, name FROM task WHERE id IN %s
                 """,
                 (tuple(task_ids),)
             )
-            task_names = [row['name'] for row in cursor.fetchall()]
-        return task_names
+            return {row['id']: row['name'] for row in cursor.fetchall()}
 
     def get_tasks_by_stage(self, stage: str):
         with self.conn.cursor(cursor_factory=DictCursor) as cursor:
@@ -502,10 +655,46 @@ class Database:
             """, (stage,))
             return cursor.fetchall()
 
-    def add_task_to_project(self, project_id, task_id):
+    def add_task_to_project(self, project_id, task_id, font_id=None, comments=None):
         with self.conn.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO project_task (project_id, task_id) VALUES (%s, %s)",
-                (project_id, task_id)
+                "INSERT INTO project_task (project_id, task_id, font_id, comments) VALUES (%s, %s, %s, %s)",
+                (project_id, task_id, font_id, comments)
             )
             self.conn.commit()
+
+    def remove_task_from_project(self, project_id, task_id, font_id=None):
+        with self.conn.cursor() as cursor:
+            if font_id:
+                cursor.execute(
+                    "DELETE FROM project_task WHERE project_id = %s AND task_id = %s AND font_id = %s",
+                    (project_id, task_id, font_id)
+                )
+            else:
+                cursor.execute(
+                    "DELETE FROM project_task WHERE project_id = %s AND task_id = %s AND font_id IS NULL",
+                    (project_id, task_id)
+                )
+            self.conn.commit()
+
+    def get_project_task_info(self, project_id, task_id, font_id=None):
+        with self.conn.cursor(cursor_factory=DictCursor) as cursor:
+            if font_id:
+                cursor.execute("""
+                    SELECT pt.*, t.name as task_name, f.name as font_name
+                    FROM project_task pt
+                    JOIN task t ON pt.task_id = t.id
+                    LEFT JOIN font f ON pt.font_id = f.id
+                    WHERE pt.project_id = %s AND pt.task_id = %s AND pt.font_id = %s
+                """, (project_id, task_id, font_id))
+            else:
+                cursor.execute("""
+                    SELECT pt.*, t.name as task_name, NULL as font_name
+                    FROM project_task pt
+                    JOIN task t ON pt.task_id = t.id
+                    WHERE pt.project_id = %s AND pt.task_id = %s AND pt.font_id IS NULL
+                """, (project_id, task_id))
+            return cursor.fetchone()
+
+    def close(self):
+        self.conn.close()

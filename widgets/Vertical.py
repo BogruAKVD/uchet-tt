@@ -273,6 +273,7 @@ class Radio(StatefulSelect[T], Generic[T]):
     def _is_text_checked(
             self, data: dict, case: Case, manager: DialogManager,
     ) -> bool:
+        print(data)
         item_id = self.item_id_getter(data["item"])
         if manager.is_preview():
             return item_id == self._preview_checked_id(manager, item_id)
