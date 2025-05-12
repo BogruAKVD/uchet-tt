@@ -22,15 +22,62 @@ class CreateProjectState(StatesGroup):
 
 
 async def project_confirm_getter(dialog_manager: DialogManager, **kwargs):
-    base_data = await project_getter(dialog_manager, **kwargs)
-    data = dialog_manager.current_context().dialog_data
+    dialog_data = dialog_manager.current_context().dialog_data
+    db = dialog_manager.middleware_data["db"]
 
     widget = dialog_manager.find("tasks_ms")
-    selected_task_ids_with_fonts = widget.get_checked()
+    selected_task_ids_with_fonts = widget.get_checked() if widget else []
+
+
+    tasks_by_font = {}
+    for task_id_with_font in selected_task_ids_with_fonts:
+        parts = task_id_with_font.split('_')
+        task_id = int(parts[0])
+        font_name = parts[1] if len(parts) > 1 and parts[1] != "NONE" else "Без шрифта"
+
+        task = db.get_task_by_id(task_id)
+        if not task:
+            continue
+
+        if font_name not in tasks_by_font:
+            tasks_by_font[font_name] = {}
+
+        department = task.get('department_type', 'Без отдела')
+        if department not in tasks_by_font[font_name]:
+            tasks_by_font[font_name][department] = []
+
+        tasks_by_font[font_name][department].append(task['name'])
+
+
+    formatted_tasks = []
+    for font_name, departments in tasks_by_font.items():
+        font_header = f"Шрифт: {font_name}" if font_name != "Без шрифта" else "Задачи без шрифта"
+        font_tasks = [font_header]
+
+        for department, tasks in departments.items():
+            dept_header = f"  Отдел: {department}" if department != "Без отдела" else "  Без отдела"
+            font_tasks.append(dept_header)
+            font_tasks.extend([f"    - {task}" for task in tasks])
+
+        formatted_tasks.append("\n".join(font_tasks))
+
+
+    custom_tasks = dialog_data.get("custom_tasks", [])
+    formatted_custom_tasks = []
+    if custom_tasks:
+        formatted_custom_tasks.append("Уникальные задачи проекта:")
+        for task in custom_tasks:
+            font_name = task.get('font_name', 'Без шрифта')
+            department = task.get('department_type', 'Без отдела')
+            formatted_custom_tasks.append(
+                f"- {task['name']} (шрифт: {font_name}, отдел: {department})"
+            )
 
     return {
-        "selected_task_ids_with_fonts": selected_task_ids_with_fonts,
-        **base_data
+        "name": dialog_data.get("name", "Не указано"),
+        "project_type": dialog_data.get("project_type", "Не указан"),
+        "selected_tasks": "\n".join(formatted_tasks) if formatted_tasks else "Нет выбранных задач",
+        "custom_tasks": "\n".join(formatted_custom_tasks) if formatted_custom_tasks else "Нет уникальных задач",
     }
 
 
@@ -42,19 +89,18 @@ async def project_getter(dialog_manager: DialogManager, **kwargs):
     stage = data.get("stage", None)
     current_font_name = data.get("current_font_name")
 
-    fonts = data.get("fonts", [])
+    fonts = data.get("fonts", [data.get("name")])
+    data["fonts"]=fonts
 
-    # Get tasks for current stage
     tasks = []
     if stage:
         tasks = db.get_tasks_by_stage(stage)
-        tasks = [dict(task) for task in tasks]
         for task in tasks:
             task['font_name'] = current_font_name
 
     return {
         "name": data.get("name"),
-        "project_type": "Не указан" if project_type is None else project_type,
+        "project_type": project_type,
         "current_font_name": current_font_name,
         "fonts": fonts,
         "stage": "Не указана" if stage is None else stage,
@@ -84,7 +130,7 @@ async def on_new_font_entered(message: Message, widget: MessageInput, dialog_man
         await message.answer("Название шрифта не может быть пустым. Пожалуйста, введите название.")
         return
 
-    dialog_manager.current_context().dialog_data.setdefault("fonts", []).append(font_name)
+    dialog_manager.current_context().dialog_data["fonts"].append(font_name)
     dialog_manager.current_context().dialog_data["current_font_name"] = font_name
     await dialog_manager.switch_to(CreateProjectState.stage_selection)
 
@@ -95,8 +141,7 @@ async def on_font_selected(callback: CallbackQuery, select: Select, dialog_manag
 
 
 async def on_stage_selected(callback: CallbackQuery, select: Select, dialog_manager: DialogManager, item_id):
-    stage = None if item_id == "NONE" else item_id
-    dialog_manager.current_context().dialog_data["stage"] = stage
+    dialog_manager.current_context().dialog_data["stage"] = item_id
     await dialog_manager.next()
 
 
@@ -135,12 +180,23 @@ async def on_custom_task_name_entered(message: Message, widget: MessageInput, di
 
 async def on_custom_task_department_selected(callback: CallbackQuery, select: Select, dialog_manager: DialogManager,
                                              item_id):
-    department = None if item_id == "None" else item_id
-    current_task = {"name": dialog_manager.current_context().dialog_data["current_custom_task"],
-                    "department": department}
-    dialog_manager.current_context().dialog_data.setdefault("custom_tasks", []).append(current_task.copy())
+    data = dialog_manager.current_context().dialog_data
+    current_font_name = data.get("current_font_name")
+    department = item_id
 
-    await callback.answer(f"Добавлена задача: {current_task['name']} ({department or 'без отдела'})")
+    current_task = data.get("current_custom_task", {})
+
+    custom_task = {
+        "name": current_task.get("name"),
+        "stage": data.get("stage"),
+        "department": department,
+        "font_name": current_font_name,
+        "comments": None
+    }
+
+    data.setdefault("custom_tasks", []).append(custom_task)
+
+    await callback.answer(f"Добавлена задача: {custom_task['name']} ({department or 'без отдела'})")
     await dialog_manager.switch_to(CreateProjectState.task_selection)
 
 
@@ -149,32 +205,34 @@ async def create_project(callback: CallbackQuery, widget: Any, dialog_manager: D
     name = data.get("name")
     project_type = data.get("project_type")
     custom_tasks = data.get("custom_tasks", [])
-    fonts = data.get("fonts", [])
     db = dialog_manager.middleware_data["db"]
 
     widget = dialog_manager.find("tasks_ms")
     selected_task_ids_with_fonts = widget.get_checked()
 
-    # Prepare tasks with fonts for project creation
     tasks_with_fonts = []
     for task_id_with_font in selected_task_ids_with_fonts:
         parts = task_id_with_font.split('_')
         task_id = int(parts[0])
-        font_name = parts[1]
+        font_name = parts[1] if parts[1] != "NONE" else None
         tasks_with_fonts.append({
             "task_id": task_id,
             "font_name": font_name,
             "comments": None
         })
+
     try:
-        # Create project with all tasks
         project_id = db.create_project(
             name=name,
             project_type=project_type,
             tasks_with_fonts=tasks_with_fonts,
+            custom_tasks_with_fonts=custom_tasks,
         )
+        await callback.answer(f"Проект '{name}' успешно создан!")
     except Exception as e:
-        await callback.answer(f"Ошибка при создании проекта: {str(e)}")
+        await callback.answer(f"Ошибка при создании проекта: {str(e)}", show_alert=True)
+        return
+
     await dialog_manager.done()
 
 
@@ -196,7 +254,7 @@ def create_project_dialog():
                 items=[
                     ("плановый", "Плановый"),
                     ("клиентский", "Клиентский"),
-                    ("кастом", "Кастом"),
+                    # ("кастом", "Кастом"),
                     ("непроектный", "Непроектный"),
                 ],
                 id="project_type_select",
@@ -212,9 +270,9 @@ def create_project_dialog():
         Window(
             Format("Выберите шрифт для задач (текущий: {current_font_name})"),
             VerticalSelect(
-                text=Format("{item[name]}"),
+                text=Format("{item}"),
                 items="fonts",
-                item_id_getter=lambda item: str(item["id"]),
+                item_id_getter=lambda item: item,
                 id="font_select",
                 on_click=on_font_selected,
             ),
@@ -226,7 +284,7 @@ def create_project_dialog():
             Button(
                 Const("🚫 Без шрифта"),
                 id="no_font",
-                on_click=lambda c, w, d: on_font_selected(c, w, d, "NONE")
+                on_click=lambda c, w, d: on_font_selected(c, w, d, "None")
             ),
             Row(
                 Back(Const("⬅️ Назад")),
@@ -258,14 +316,15 @@ def create_project_dialog():
                     ("отрисовка капитель", "Отрисовка капитель"),
                     ("техничка", "Техничка"),
                     ("оформление", "Оформление"),
-                    ("NONE", "Задачи вне этапа")
+                    ("None", "Задачи вне этапа")
                 ],
                 id="stage_select",
                 item_id_getter=lambda x: x[0],
                 on_click=on_stage_selected,
             ),
             Row(
-                Back(Const("⬅️ Назад")),
+                Button(Const("⬅️ Назад"), id="back_to_font_selection",
+                       on_click=lambda c, w, d: d.switch_to(CreateProjectState.font_selection)),
                 Button(
                     Const("➡️ Подтвердить создание проекта"),
                     id="skip_tasks",
@@ -343,12 +402,9 @@ def create_project_dialog():
                 "Подтвердите создание проекта:\n\n"
                 "Название: {name}\n"
                 "Тип проекта: {project_type}\n"
-                "Стадия: {stage}\n\n"
                 "Выбранные задачи:\n"
-                #TODO beter output
-                "{selected_task_ids_with_fonts}\n\n"
+                "{selected_tasks}\n\n"
                 "Уникальные задачи проекта:\n"
-                #TODO beter output
                 "{custom_tasks}"
             ),
             Button(

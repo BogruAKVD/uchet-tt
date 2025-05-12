@@ -3,14 +3,16 @@ from aiogram.filters import Command, BaseFilter
 from aiogram_dialog import DialogManager, StartMode
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-from dialogs.create_position import create_position_dialog, CreatePositionState
-from dialogs.create_project import CreateProjectState, create_project_dialog
-from dialogs.create_task import CreateTaskState, create_task_dialog
-from dialogs.create_worker import create_worker_dialog, CreateWorkerState
-from dialogs.get_all_projects import get_all_projects_dialog, ProjectState
-from dialogs.get_all_tasks import AllTasksState, get_all_tasks_dialog
-from dialogs.edit_worker import edit_worker_dialog, EditWorkerState
+from dialogs.admin.create_custom_task import create_custom_task_dialog, CreateCustomTaskState
+from dialogs.admin.create_position import create_position_dialog, CreatePositionState
+from dialogs.admin.create_project import CreateProjectState, create_project_dialog
+from dialogs.admin.create_task import CreateTaskState, create_task_dialog
+from dialogs.admin.create_worker import create_worker_dialog, CreateWorkerState
+from dialogs.admin.edit_worker import edit_worker_dialog, EditWorkerState
+from dialogs.admin.send_message import send_message_dialog, SendMessageState
 from utils import is_admin
+
+
 
 class AdminFilter(BaseFilter):
     async def __call__(self, message: types.Message) -> bool:
@@ -21,11 +23,11 @@ async def show_main_keyboard(message: types.Message):
         keyboard=[
             [KeyboardButton(text="Создать проект")],
             [KeyboardButton(text="Создать задачу")],
+            [KeyboardButton(text="Создать кастом")],
             [KeyboardButton(text="Создать сотрудника")],
             [KeyboardButton(text="Создать должность")],
-            [KeyboardButton(text="Посмотреть все задачи")],
-            [KeyboardButton(text="Посмотреть все проекты")],
             [KeyboardButton(text="Редактировать сотрудника")],
+            [KeyboardButton(text="Отправить сообщение")],
         ],
         resize_keyboard=True
     )
@@ -39,11 +41,11 @@ admin_router = Router()
 admin_router.message.filter(AdminFilter())
 admin_router.include_router(create_project_dialog())
 admin_router.include_router(create_task_dialog())
+admin_router.include_router(create_custom_task_dialog())
 admin_router.include_router(create_worker_dialog())
 admin_router.include_router(create_position_dialog())
-admin_router.include_router(get_all_tasks_dialog())
-admin_router.include_router(get_all_projects_dialog())
 admin_router.include_router(edit_worker_dialog())
+admin_router.include_router(send_message_dialog())
 
 
 @admin_router.message(Command("start"))
@@ -59,6 +61,10 @@ async def create_project_handler(message: types.Message, dialog_manager: DialogM
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(CreateTaskState.name, mode=StartMode.RESET_STACK)
 
+@admin_router.message(F.text == "Создать кастом")
+async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
+    await dialog_manager.start(CreateCustomTaskState.select_font, mode=StartMode.RESET_STACK)
+
 @admin_router.message(F.text == "Создать сотрудника")
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(CreateWorkerState.name, mode=StartMode.RESET_STACK)
@@ -67,15 +73,11 @@ async def create_task_handler(message: types.Message, dialog_manager: DialogMana
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(CreatePositionState.name, mode=StartMode.RESET_STACK)
 
-@admin_router.message(F.text == "Посмотреть все задачи")
-async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
-    await dialog_manager.start(AllTasksState.show_tasks, mode=StartMode.RESET_STACK)
-
-@admin_router.message(F.text == "Посмотреть все проекты")
-async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
-    await dialog_manager.start(ProjectState.list_projects, mode=StartMode.RESET_STACK)
-
 @admin_router.message(F.text == "Редактировать сотрудника")
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(EditWorkerState.select_worker, mode=StartMode.RESET_STACK)
+
+@admin_router.message(F.text == "Отправить сообщение")
+async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
+    await dialog_manager.start(SendMessageState.select_workers, mode=StartMode.RESET_STACK)
     
