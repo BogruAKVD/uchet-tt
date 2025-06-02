@@ -49,6 +49,7 @@ class Database:
                 self.create_worker_active_project_table(cursor)
                 self.create_time_entry_table(cursor)
                 self.create_admin_table(cursor)
+                self.create_time_entry_detail_view(cursor)
                 cursor.execute("COMMIT;")
             except Exception as e:
                 cursor.execute("ROLLBACK;")
@@ -147,6 +148,60 @@ class Database:
                 telegram_id BIGINT UNIQUE NOT NULL,
                 created_at TIMESTAMP DEFAULT NOW()
             );
+        """)
+
+    def create_time_entry_detail_view(self, cursor):
+        cursor.execute("""
+            CREATE OR REPLACE VIEW time_entry_detail AS
+            SELECT 
+                te.id,
+                te.entry_date,
+                te.hours,
+
+                -- Worker details
+                w.id AS worker_id,
+                w.telegram_id AS worker_telegram_id,
+                w.name AS worker_name,
+                w.weekly_hours,
+                w.reminder_day,
+                w.reminder_time,
+                w.can_receive_custom_tasks,
+                w.can_receive_non_project_tasks,
+
+                -- Position details
+                p.id AS position_id,
+                p.name AS position_name,
+                p.department_type AS position_department,
+
+                -- Project details
+                prj.id AS project_id,
+                prj.name AS project_name,
+                prj.type AS project_type,
+                prj.status AS project_status,
+
+                -- Task details
+                t.id AS task_id,
+                t.name AS task_name,
+                t.stage AS task_stage,
+                t.department_type AS task_department,
+                t.is_unique AS task_is_unique,
+
+                -- Font details
+                f.id AS font_id,
+                f.name AS font_name,
+
+                -- Project task details
+                pt.id AS project_task_id,
+                pt.status AS project_task_status,
+                pt.comments AS project_task_comments
+
+            FROM time_entry te
+            JOIN worker w ON te.worker_id = w.id
+            LEFT JOIN position p ON w.position_id = p.id
+            JOIN project_task pt ON te.project_task_id = pt.id
+            JOIN project prj ON pt.project_id = prj.id
+            JOIN task t ON pt.task_id = t.id
+            LEFT JOIN font f ON pt.font_id = f.id;
         """)
 
 
