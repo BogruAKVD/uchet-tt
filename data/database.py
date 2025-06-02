@@ -66,7 +66,7 @@ class Database:
                 reminder_day TEXT CHECK (reminder_day IN ('понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье')) DEFAULT 'пятница',
                 reminder_time TIME WITHOUT TIME ZONE DEFAULT '17:00:00',
                 can_receive_custom_tasks BOOLEAN DEFAULT FALSE,
-                can_receive_non_project_tasks BOOLEAN DEFAULT FALSE
+                can_receive_nonproject_tasks BOOLEAN DEFAULT FALSE
             );
         """)
 
@@ -83,8 +83,8 @@ class Database:
             CREATE TABLE IF NOT EXISTS position (
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
-                department_type TEXT NOT NULL CHECK (department_type IN ('шрифтовой', 'технический', 'графический')),
-                UNIQUE (name, department_type)
+                department TEXT NOT NULL CHECK (department IN ('шрифтовой', 'технический', 'графический')),
+                UNIQUE (name, department)
             );
         """)
 
@@ -93,7 +93,7 @@ class Database:
             CREATE TABLE IF NOT EXISTS project (
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
-                type TEXT NOT NULL CHECK (type IN ('плановый', 'клиентский', 'для кастома', 'непроектный')),
+                type TEXT NOT NULL CHECK (type IN ('плановый', 'клиентский', 'для кастомов', 'для непроектных')),
                 status TEXT NOT NULL DEFAULT 'в работе' CHECK (status IN ('в работе', 'завершён', 'на паузе', 'отменен'))
             );
         """)
@@ -104,8 +104,10 @@ class Database:
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
                 stage TEXT NULL,
-                department_type TEXT NULL,
-                is_unique BOOLEAN NOT NULL DEFAULT FALSE
+                department TEXT NULL,
+                is_unique BOOLEAN NOT NULL DEFAULT FALSE,
+                is_nonproject BOOLEAN NOT NULL DEFAULT FALSE,
+                is_custom BOOLEAN NOT NULL DEFAULT FALSE
             );
         """)
 
@@ -128,7 +130,8 @@ class Database:
                 project_task_id INTEGER NOT NULL REFERENCES project_task(id),
                 worker_id INTEGER NOT NULL REFERENCES worker(id),
                 entry_date DATE NOT NULL DEFAULT CURRENT_DATE,
-                hours DOUBLE PRECISION NOT NULL CHECK (hours > 0)
+                hours DOUBLE PRECISION NOT NULL CHECK (hours > 0),
+                comment TEXT
             );
         """)
 
@@ -157,6 +160,7 @@ class Database:
                 te.id,
                 te.entry_date,
                 te.hours,
+                te.comment,
 
                 -- Worker details
                 w.id AS worker_id,
@@ -166,12 +170,12 @@ class Database:
                 w.reminder_day,
                 w.reminder_time,
                 w.can_receive_custom_tasks,
-                w.can_receive_non_project_tasks,
+                w.can_receive_nonproject_tasks,
 
                 -- Position details
                 p.id AS position_id,
                 p.name AS position_name,
-                p.department_type AS position_department,
+                p.department AS position_department,
 
                 -- Project details
                 prj.id AS project_id,
@@ -183,8 +187,11 @@ class Database:
                 t.id AS task_id,
                 t.name AS task_name,
                 t.stage AS task_stage,
-                t.department_type AS task_department,
+                t.department AS task_department,
                 t.is_unique AS task_is_unique,
+                t.is_custom AS task_is_custom,
+                t.is_nonproject AS task_is_nonproject,
+
 
                 -- Font details
                 f.id AS font_id,

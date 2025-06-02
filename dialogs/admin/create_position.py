@@ -12,7 +12,7 @@ from data.postition_operations import PositionOperations
 
 class CreatePositionState(StatesGroup):
     name = State()
-    department_type = State()
+    department = State()
     confirm = State()
 
 
@@ -21,7 +21,7 @@ async def position_getter(dialog_manager: DialogManager, **kwargs):
 
     return {
         "name": data.get("name", "Не указано"),
-        "department_type": data.get("department_type", "Не указан"),
+        "department": data.get("department", "Не указан"),
     }
 
 
@@ -35,18 +35,18 @@ async def on_name_entered(message: Message, widget: MessageInput, dialog_manager
 
 
 async def on_department_selected(callback: CallbackQuery, select: Select, dialog_manager: DialogManager, item_id):
-    dialog_manager.current_context().dialog_data["department_type"] = item_id
+    dialog_manager.current_context().dialog_data["department"] = item_id
     await dialog_manager.next()
 
 
 async def create_position(callback: CallbackQuery, widget: Any, dialog_manager: DialogManager):
     data = dialog_manager.current_context().dialog_data
     name = data.get("name")
-    department_type = data.get("department_type")
+    department = data.get("department")
 
     db = dialog_manager.middleware_data["db"]
     try:
-        position_id = PositionOperations.create_position(db, name=name, department_type=department_type)
+        position_id = PositionOperations.create_position(db, name=name, department=department)
         await callback.answer(f"Должность '{name}' успешно создана (ID: {position_id})")
     except Exception as e:
         await callback.answer(f"Ошибка при создании должности: {str(e)}")
@@ -83,14 +83,14 @@ def create_position_dialog():
                 Back(Const("⬅️ Назад")),
                 Cancel(Const("❌ Отмена")),
             ),
-            state=CreatePositionState.department_type,
+            state=CreatePositionState.department,
             getter=position_getter,
         ),
         Window(
             Format(
                 "Подтвердите создание должности:\n\n"
                 "Название: {name}\n"
-                "Тип отдела: {department_type}"
+                "Тип отдела: {department}"
             ),
             Button(
                 Const("✅ Создать должность"),

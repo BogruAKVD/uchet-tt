@@ -45,10 +45,13 @@ class TimeEntryOperations:
     @staticmethod
     def add_time_entry(db: Database, time_entry_data):
         with db.conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO time_entry (project_task_id, worker_id, hours)
-                VALUES (%(project_task_id)s, %(worker_id)s, %(hours)s);
-            """, time_entry_data)
+            cursor.execute(
+                """INSERT INTO time_entry (project_task_id, worker_id, hours, comment) 
+                VALUES (%s, %s, %s, %s)""",
+                (time_entry_data["project_task_id"],
+                 time_entry_data["worker_id"],
+                 time_entry_data["hours"],
+                 time_entry_data.get("comment")))
             db.conn.commit()
 
     @staticmethod

@@ -16,6 +16,7 @@ class TimeEntryStates(StatesGroup):
     select_project = State()
     select_task = State()
     enter_hours = State()
+    enter_comment = State()
     confirmation = State()
 
 
@@ -30,6 +31,9 @@ async def get_active_projects(dialog_manager: DialogManager, **kwargs):
         custom_project = ProjectOperations.get_custom_project(db)
         active_projects.insert(0, custom_project)
 
+    if worker.get('can_receive_nonproject_tasks', False):
+        nonproject_project = ProjectOperations.get_nonproject_project(db)
+        active_projects.insert(0, nonproject_project)
 
     return {
         "active_projects": active_projects,
@@ -72,11 +76,15 @@ async def hours_entered(message: Message, widget: TextInput,
         await message.answer("Пожалуйста, введите корректное число часов (больше 0)")
 
 
+async def comment_entered(message: Message, widget: TextInput,
+                          dialog_manager: DialogManager, comment: str):
+    dialog_manager.dialog_data["comment"] = comment
+    await dialog_manager.next()
+
+
 async def get_confirmation_data(dialog_manager: DialogManager, **kwargs):
     db = dialog_manager.middleware_data['db']
     project_task_id = dialog_manager.dialog_data.get("project_task_id")
-    hours = dialog_manager.dialog_data.get("hours")
-
     project_task_info = TaskOperations.get_project_task_info(db, project_task_id)
 
     return {
@@ -84,7 +92,8 @@ async def get_confirmation_data(dialog_manager: DialogManager, **kwargs):
         "task_name": project_task_info['task_name'],
         "font_name": project_task_info.get('font_name', 'Не указан'),
         "project_task_id": project_task_id,
-        "hours": hours
+        "hours": dialog_manager.dialog_data.get("hours"),
+        "comment": dialog_manager.dialog_data.get("comment", 'Не указан')
     }
 
 
@@ -98,7 +107,8 @@ async def save_time_entry(callback: CallbackQuery, button: Button,
     time_entry_data = {
         "project_task_id": dialog_manager.dialog_data["project_task_id"],
         "worker_id": worker['id'],
-        "hours": dialog_manager.dialog_data["hours"]
+        "hours": dialog_manager.dialog_data["hours"],
+        "comment": dialog_manager.dialog_data.get("comment", None)
     }
 
     try:
@@ -153,11 +163,23 @@ def create_time_entry_dialog():
             state=TimeEntryStates.enter_hours
         ),
         Window(
+            Const("Если хотите оставить комментарий (например для непроектных задач) введите его и отправьте сообщение"),
+            TextInput(
+                id="comment_input",
+                on_success=comment_entered
+            ),
+            Button(Const("➡️ К подтверждению"), id="skip_comment", on_click=lambda c, b, d: d.next()),
+            Back(Const("⬅️ Назад")),
+            Cancel(Const("❌ Отмена")),
+            state=TimeEntryStates.enter_comment
+        ),
+        Window(
             Format("Подтвердите ввод времени:\n\n"
                    "Проект: {project_name}\n"
                    "Задача: {task_name}\n"
                    "Шрифт: {font_name}\n"
-                   "Часы: {hours}"),
+                   "Часы: {hours}\n"
+                   "Комментарий: {comment}"),
             Button(Const("✅ Подтвердить"), id="confirm", on_click=save_time_entry),
             Back(Const("⬅️ Назад")),
             Cancel(Const("❌ Отмена")),

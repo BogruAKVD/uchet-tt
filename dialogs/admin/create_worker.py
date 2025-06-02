@@ -6,12 +6,11 @@ from aiogram_dialog.widgets.markup.reply_keyboard import ReplyKeyboardFactory
 from aiogram_dialog.widgets.text import Const, Format
 from aiogram_dialog.widgets.input import MessageInput
 from aiogram.types import Message, CallbackQuery
-from aiogram_dialog.widgets.kbd import Select
 
 from data.postition_operations import PositionOperations
 from data.worker_operations import WorkerOperations
 from widgets.RequestUser import RequestUser
-from widgets.Vertical import Multiselect
+from widgets.Vertical import Select, Multiselect
 
 
 class CreateWorkerState(StatesGroup):
@@ -35,7 +34,7 @@ async def worker_getter(dialog_manager: DialogManager, **kwargs):
 
     positions = []
     if department:
-        positions = [p for p in all_positions if p['department_type'] == department]
+        positions = [p for p in all_positions if p['department'] == department]
     else:
         positions = all_positions
 
@@ -50,7 +49,7 @@ async def worker_getter(dialog_manager: DialogManager, **kwargs):
     permissions = []
     if data.get("can_receive_custom_tasks", False):
         permissions.append("Кастомные задачи")
-    if data.get("can_receive_non_project_tasks", False):
+    if data.get("can_receive_nonproject_tasks", False):
         permissions.append("Непроектные задачи")
 
     return {
@@ -61,7 +60,7 @@ async def worker_getter(dialog_manager: DialogManager, **kwargs):
         "telegram_id": data.get("telegram_id", "Не указан"),
         "weekly_hours": data.get("weekly_hours", "Не указано"),
         "can_receive_custom_tasks": data.get("can_receive_custom_tasks", False),
-        "can_receive_non_project_tasks": data.get("can_receive_non_project_tasks", False),
+        "can_receive_nonproject_tasks": data.get("can_receive_nonproject_tasks", False),
         "permissions": permissions,
     }
 
@@ -110,7 +109,7 @@ async def on_continue_from_permissions(callback: CallbackQuery, button: Button, 
     data = dialog_manager.current_context().dialog_data
     data.update({
         "can_receive_custom_tasks": ("custom_tasks" in selected_items),
-        "can_receive_non_project_tasks": ("non_project_tasks" in selected_items),
+        "can_receive_nonproject_tasks": ("nonproject_tasks" in selected_items),
     })
 
     await dialog_manager.next()
@@ -127,7 +126,7 @@ async def create_worker(callback: CallbackQuery, widget: Any, dialog_manager: Di
                                   position_id=data["position_id"],
                                   weekly_hours=data["weekly_hours"],
                                   can_receive_custom_tasks=data.get("can_receive_custom_tasks", False),
-                                  can_receive_non_project_tasks=data.get("can_receive_non_project_tasks", False)
+                                  can_receive_nonproject_tasks=data.get("can_receive_nonproject_tasks", False)
                                   )
         await callback.answer(f"Сотрудник успешно добавлен (ID: {worker_id})")
     except Exception as e:
@@ -219,7 +218,7 @@ def create_worker_dialog():
                 unchecked_text=Format("❌ {item[0]}"),
                 items=[
                     ("Кастомные задачи", "custom_tasks"),
-                    ("Непроектные задачи", "non_project_tasks"),
+                    ("Непроектные задачи", "nonproject_tasks"),
                 ],
                 id="perms_ms",
                 item_id_getter=lambda x: x[1],

@@ -18,8 +18,8 @@ class CreateProjectState(StatesGroup):
     new_font = State()
     stage_selection = State()
     task_selection = State()
-    custom_task_department = State()
-    custom_task_name = State()
+    unique_task_department = State()
+    unique_task_name = State()
     confirm = State()
 
 
@@ -43,7 +43,7 @@ async def project_confirm_getter(dialog_manager: DialogManager, **kwargs):
         if font_name not in tasks_by_font:
             tasks_by_font[font_name] = {}
 
-        department = task.get('department_type', 'Без отдела')
+        department = task.get('department', 'Без отдела')
         if department not in tasks_by_font[font_name]:
             tasks_by_font[font_name][department] = []
 
@@ -61,14 +61,14 @@ async def project_confirm_getter(dialog_manager: DialogManager, **kwargs):
 
         formatted_tasks.append("\n".join(font_tasks))
 
-    custom_tasks = dialog_data.get("custom_tasks", [])
-    formatted_custom_tasks = []
-    if custom_tasks:
-        formatted_custom_tasks.append("Уникальные задачи проекта:")
-        for task in custom_tasks:
+    unique_tasks = dialog_data.get("unique_tasks", [])
+    formatted_unique_tasks = []
+    if unique_tasks:
+        formatted_unique_tasks.append("Уникальные задачи проекта:")
+        for task in unique_tasks:
             font_name = task.get('font_name', 'Без шрифта')
-            department = task.get('department_type', 'Без отдела')
-            formatted_custom_tasks.append(
+            department = task.get('department', 'Без отдела')
+            formatted_unique_tasks.append(
                 f"- {task['name']} (шрифт: {font_name}, отдел: {department})"
             )
 
@@ -76,7 +76,7 @@ async def project_confirm_getter(dialog_manager: DialogManager, **kwargs):
         "name": dialog_data.get("name", "Не указано"),
         "project_type": dialog_data.get("project_type", "Не указан"),
         "selected_tasks": "\n".join(formatted_tasks) if formatted_tasks else "Нет выбранных задач",
-        "custom_tasks": "\n".join(formatted_custom_tasks) if formatted_custom_tasks else "Нет уникальных задач",
+        "unique_tasks": "\n".join(formatted_unique_tasks) if formatted_unique_tasks else "Нет уникальных задач",
     }
 
 
@@ -104,7 +104,7 @@ async def project_getter(dialog_manager: DialogManager, **kwargs):
         "fonts": fonts,
         "stage": "Не указана" if stage is None else stage,
         "tasks": tasks,
-        "custom_tasks": data.get("custom_tasks", []),
+        "unique_tasks": data.get("unique_tasks", []),
     }
 
 
@@ -165,19 +165,19 @@ async def on_back_from_tasks(callback: CallbackQuery, button: Button, dialog_man
     await dialog_manager.back()
 
 
-async def on_custom_task_department_selected(callback: CallbackQuery, select: Select, dialog_manager: DialogManager,
+async def on_unique_task_department_selected(callback: CallbackQuery, select: Select, dialog_manager: DialogManager,
                                              item_id):
-    dialog_manager.current_context().dialog_data["current_custom_task"] = {
+    dialog_manager.current_context().dialog_data["current_unique_task"] = {
         "department": item_id,
         "names": []
     }
-    await dialog_manager.switch_to(CreateProjectState.custom_task_name)
+    await dialog_manager.switch_to(CreateProjectState.unique_task_name)
 
 
-async def on_custom_task_name_entered(message: Message, widget: MessageInput, dialog_manager: DialogManager):
+async def on_unique_task_name_entered(message: Message, widget: MessageInput, dialog_manager: DialogManager):
     data = dialog_manager.current_context().dialog_data
     current_font_name = data.get("current_font_name")
-    department = data["current_custom_task"]["department"]
+    department = data["current_unique_task"]["department"]
     stage = data.get("stage")
 
     task_names = [name.strip() for name in message.text.split('\n') if name.strip()]
@@ -186,17 +186,17 @@ async def on_custom_task_name_entered(message: Message, widget: MessageInput, di
         await message.answer("Название задачи не может быть пустым. Пожалуйста, введите название.")
         return
 
-    custom_tasks = data.setdefault("custom_tasks", [])
+    unique_tasks = data.setdefault("unique_tasks", [])
 
     for task_name in task_names:
-        custom_task = {
+        unique_task = {
             "name": task_name,
             "stage": stage,
             "department": department,
             "font_name": current_font_name,
             "comments": None
         }
-        custom_tasks.append(custom_task)
+        unique_tasks.append(unique_task)
 
     await message.answer(f"Добавлены {task_names} задачи в отдел {department or 'без отдела'}")
     await dialog_manager.switch_to(CreateProjectState.task_selection)
@@ -206,7 +206,7 @@ async def create_project(callback: CallbackQuery, widget: Any, dialog_manager: D
     data = dialog_manager.current_context().dialog_data
     name = data.get("name")
     project_type = data.get("project_type")
-    custom_tasks = data.get("custom_tasks", [])
+    unique_tasks = data.get("unique_tasks", [])
     db = dialog_manager.middleware_data["db"]
 
     widget = dialog_manager.find("tasks_ms")
@@ -228,7 +228,7 @@ async def create_project(callback: CallbackQuery, widget: Any, dialog_manager: D
             name=name,
             project_type=project_type,
             tasks_with_fonts=tasks_with_fonts,
-            custom_tasks_with_fonts=custom_tasks,
+            unique_tasks_with_fonts=unique_tasks,
         )
         await callback.answer(f"Проект '{name}' успешно создан!")
     except Exception as e:
@@ -257,7 +257,7 @@ def create_project_dialog():
                     ("плановый", "Плановый"),
                     ("клиентский", "Клиентский"),
                     # ("кастом", "Кастом"),
-                    ("непроектный", "Непроектный"),
+                    # ("непроектный", "Непроектный"),
                 ],
                 id="project_type_select",
                 item_id_getter=lambda x: x[0],
@@ -358,10 +358,9 @@ def create_project_dialog():
                     on_click=select_all_tasks
                 ),
                 Button(
-                    Const("➕ Добавить кастомную задачу"),
-                    id="add_custom_task",
-                    on_click=lambda c, w, d: d.switch_to(CreateProjectState.custom_task_department)
-                    # Changed to department first
+                    Const("➕ Добавить уникальную задачу"),
+                    id="add_unique_task",
+                    on_click=lambda c, w, d: d.switch_to(CreateProjectState.unique_task_department)
                 ),
                 Cancel(Const("❌ Отмена")),
             ),
@@ -369,7 +368,7 @@ def create_project_dialog():
             getter=project_getter,
         ),
         Window(
-            Const("Выберите отдел для кастомной задачи:"),
+            Const("Выберите отдел для уникальной задачи:"),
             VerticalSelect(
                 text=Format("{item[1]}"),
                 items=[
@@ -378,27 +377,27 @@ def create_project_dialog():
                     ("графический", "Графический"),
                     ("None", "Без отдела"),
                 ],
-                id="custom_task_dept_select",
+                id="unique_task_dept_select",
                 item_id_getter=lambda x: x[0],
-                on_click=on_custom_task_department_selected,
+                on_click=on_unique_task_department_selected,
             ),
             Row(
                 Back(Const("⬅️ Назад к выбору задач")),
                 Cancel(Const("❌ Отмена")),
             ),
-            state=CreateProjectState.custom_task_department,
+            state=CreateProjectState.unique_task_department,
         ),
         Window(
-            Const("Введите названия кастомных задач (каждое название с новой строки):"),
+            Const("Введите названия уникальных задач (каждое название с новой строки):"),
             MessageInput(
-                func=on_custom_task_name_entered,
+                func=on_unique_task_name_entered,
                 content_types=["text"]
             ),
             Row(
                 Back(Const("⬅️ Назад к выбору отдела")),
                 Cancel(Const("❌ Отмена")),
             ),
-            state=CreateProjectState.custom_task_name,
+            state=CreateProjectState.unique_task_name,
         ),
         Window(
             Format(
@@ -408,7 +407,7 @@ def create_project_dialog():
                 "Выбранные задачи:\n"
                 "{selected_tasks}\n\n"
                 "Уникальные задачи проекта:\n"
-                "{custom_tasks}"
+                "{unique_tasks}"
             ),
             Button(
                 Const("✅ Создать проект"),

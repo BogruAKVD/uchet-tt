@@ -13,7 +13,7 @@ from widgets.Vertical import Select
 class CreateTaskState(StatesGroup):
     name = State()
     stage = State()
-    department_type = State()
+    department = State()
     confirm = State()
 
 
@@ -21,14 +21,14 @@ async def task_getter(dialog_manager: DialogManager, **kwargs):
     data = dialog_manager.current_context().dialog_data
 
     stage = data.get("stage")
-    department_type = data.get("department_type")
+    department = data.get("department")
 
     return {
         "name": data.get("name", "Не указано"),
         "stage": "Не указан" if stage is None else stage,
-        "department_type": "Не указан" if department_type is None else department_type,
+        "department": "Не указан" if department is None else department,
         "raw_stage": stage,
-        "raw_department_type": department_type,
+        "raw_department": department,
     }
 
 
@@ -47,7 +47,7 @@ async def on_stage_selected(callback: CallbackQuery, select: Select, dialog_mana
 
 
 async def on_department_selected(callback: CallbackQuery, select: Select, dialog_manager: DialogManager, item_id):
-    dialog_manager.current_context().dialog_data["department_type"] = None if item_id == "None" else item_id
+    dialog_manager.current_context().dialog_data["department"] = None if item_id == "None" else item_id
     await dialog_manager.next()
 
 
@@ -56,11 +56,11 @@ async def create_task(callback: CallbackQuery, widget: Any, dialog_manager: Dial
     name = data.get("name")
 
     stage = data.get("stage")
-    department_type = data.get("department_type")
+    department = data.get("department")
 
     db = dialog_manager.middleware_data["db"]
     try:
-        TaskOperations.create_task(db, name=name, stage=stage, department_type=department_type)
+        TaskOperations.create_task(db, name=name, stage=stage, department=department)
         await callback.answer("Задача успешно создана")
     except Exception as e:
         await callback.answer(f"Ошибка при создании задачи: {str(e)}")
@@ -121,7 +121,7 @@ def create_task_dialog():
                 Back(Const("⬅️ Назад")),
                 Cancel(Const("❌ Отмена")),
             ),
-            state=CreateTaskState.department_type,
+            state=CreateTaskState.department,
             getter=task_getter,
         ),
         Window(
@@ -129,7 +129,7 @@ def create_task_dialog():
                 "Подтвердите создание задачи:\n\n"
                 "Название: {name}\n"
                 "Этап: {stage}\n"
-                "Отдел: {department_type}"
+                "Отдел: {department}"
             ),
             Button(
                 Const("✅ Создать задачу"),

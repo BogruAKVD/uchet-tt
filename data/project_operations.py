@@ -9,7 +9,7 @@ from data.database import Database
 class ProjectOperations:
     @staticmethod
     def create_project(db: Database, name: str, project_type: str, tasks_with_fonts: List[dict] = None,
-                       custom_tasks_with_fonts: List[dict] = None,
+                       unique_tasks_with_fonts: List[dict] = None,
                        status: str = Status.IN_PROGRESS.value) -> int:
         with db.conn.cursor() as cursor:
             try:
@@ -24,8 +24,8 @@ class ProjectOperations:
                     font_names.update(task['font_name'] for task in tasks_with_fonts
                                       if task.get('font_name') is not None)
 
-                if custom_tasks_with_fonts:
-                    font_names.update(task['font_name'] for task in custom_tasks_with_fonts
+                if unique_tasks_with_fonts:
+                    font_names.update(task['font_name'] for task in unique_tasks_with_fonts
                                       if task.get('font_name') is not None)
 
                 font_name_to_id = {}
@@ -61,18 +61,19 @@ class ProjectOperations:
                              task_info.get('comments'))
                         )
 
-                if custom_tasks_with_fonts:
-                    for custom_task in custom_tasks_with_fonts:
+                if unique_tasks_with_fonts:
+                    for unique_task in unique_tasks_with_fonts:
                         task_id = TaskOperations.create_task(
-                            name=custom_task['name'],
-                            stage=custom_task.get('stage'),
-                            department_type=custom_task.get('department'),
+                            db,
+                            name=unique_task['name'],
+                            stage=unique_task.get('stage'),
+                            department=unique_task.get('department'),
                             is_unique=True
                         )
 
                         font_id = None
-                        if custom_task.get('font_name') is not None:
-                            font_id = font_name_to_id.get(custom_task['font_name'])
+                        if unique_task.get('font_name') is not None:
+                            font_id = font_name_to_id.get(unique_task['font_name'])
 
                         cursor.execute(
                             """INSERT INTO project_task 
@@ -81,7 +82,7 @@ class ProjectOperations:
                             (project_id,
                              task_id,
                              font_id,
-                             custom_task.get('comments'))
+                             unique_task.get('comments'))
                         )
 
                 db.conn.commit()
@@ -125,7 +126,17 @@ class ProjectOperations:
         with db.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute("""
                  SELECT id, name FROM project 
-                 WHERE type = 'для кастома' 
+                 WHERE type = 'для кастомов' 
+                 LIMIT 1;
+             """)
+            return dict(cursor.fetchone())
+
+    @staticmethod
+    def get_nonproject_project(db: Database):
+        with db.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""
+                 SELECT id, name FROM project 
+                 WHERE type = 'для непроектных' 
                  LIMIT 1;
              """)
             return dict(cursor.fetchone())

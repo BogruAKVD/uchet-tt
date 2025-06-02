@@ -4,8 +4,8 @@ from enum import Enum
 class ProjectType(Enum):
     PLANNED = "плановый"
     CLIENT = "клиентский"
-    FOR_CUSTOM = "для кастома"
-    NONPROJECT = "непроектный"
+    FOR_CUSTOM = "для кастомов"
+    FOR_NONPROJECT = "для непроектных"
 
 
 class Status(Enum):
@@ -15,7 +15,7 @@ class Status(Enum):
     CANCELLED = "отменен"
 
 
-class DepartmentType(Enum):
+class Department(Enum):
     FONT = "шрифтовой"
     TECHNICAL = "технический"
     GRAPHIC = "графический"

@@ -5,11 +5,11 @@ from data.database import Database
 class PositionOperations:
 
     @staticmethod
-    def create_position(db: Database, name, department_type):
+    def create_position(db: Database, name, department):
         with db.conn.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO position (name, department_type) VALUES (%s, %s) RETURNING id",
-                (name, department_type)
+                "INSERT INTO position (name, department) VALUES (%s, %s) RETURNING id",
+                (name, department)
             )
             position_id = cursor.fetchone()[0]
             db.conn.commit()

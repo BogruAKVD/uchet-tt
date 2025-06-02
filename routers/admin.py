@@ -4,6 +4,7 @@ from aiogram_dialog import DialogManager, StartMode
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 from dialogs.admin.create_custom_task import create_custom_task_dialog, CreateCustomTaskState
+from dialogs.admin.create_nonproject_task import CreateNonProjectTaskState, create_nonproject_task_dialog
 from dialogs.admin.create_position import create_position_dialog, CreatePositionState
 from dialogs.admin.create_project import CreateProjectState, create_project_dialog
 from dialogs.admin.create_task import CreateTaskState, create_task_dialog
@@ -26,6 +27,7 @@ async def show_main_keyboard(message: types.Message):
             [KeyboardButton(text="Создать проект")],
             [KeyboardButton(text="Создать задачу")],
             [KeyboardButton(text="Создать кастом")],
+            [KeyboardButton(text="Создать непроектную задачу")],
             [KeyboardButton(text="Создать сотрудника")],
             [KeyboardButton(text="Создать должность")],
             [KeyboardButton(text="Редактировать сотрудника")],
@@ -46,6 +48,7 @@ admin_router.message.filter(AdminFilter())
 admin_router.include_router(create_project_dialog())
 admin_router.include_router(create_task_dialog())
 admin_router.include_router(create_custom_task_dialog())
+admin_router.include_router(create_nonproject_task_dialog())
 admin_router.include_router(create_worker_dialog())
 admin_router.include_router(create_position_dialog())
 admin_router.include_router(edit_worker_dialog())
@@ -70,6 +73,10 @@ async def create_task_handler(message: types.Message, dialog_manager: DialogMana
 @admin_router.message(F.text == "Создать кастом")
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(CreateCustomTaskState.select_font, mode=StartMode.RESET_STACK)
+
+@admin_router.message(F.text == "Создать непроектную задачу")
+async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
+    await dialog_manager.start(CreateNonProjectTaskState.select_department, mode=StartMode.RESET_STACK)
 
 @admin_router.message(F.text == "Создать сотрудника")
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):

@@ -7,15 +7,15 @@ from data.database import Database
 class WorkerOperations:
     @staticmethod
     def create_worker(db: Database, name, telegram_id, position_id, weekly_hours, can_receive_custom_tasks=False,
-                      can_receive_non_project_tasks=False, reminder_day="пятница", reminder_time="17:00:00"):
+                      can_receive_nonproject_tasks=False, reminder_day="пятница", reminder_time="17:00:00"):
         with db.conn.cursor() as cursor:
             cursor.execute(
                 """INSERT INTO worker 
                 (name, telegram_id, position_id, weekly_hours, can_receive_custom_tasks, 
-                 can_receive_non_project_tasks, reminder_day, reminder_time) 
+                 can_receive_nonproject_tasks, reminder_day, reminder_time) 
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id""",
                 (name, telegram_id, position_id, weekly_hours, can_receive_custom_tasks,
-                 can_receive_non_project_tasks, reminder_day, reminder_time)
+                 can_receive_nonproject_tasks, reminder_day, reminder_time)
             )
             worker_id = cursor.fetchone()[0]
             db.conn.commit()
@@ -34,7 +34,7 @@ class WorkerOperations:
                     w.reminder_day,
                     w.reminder_time,
                     w.can_receive_custom_tasks,
-                    w.can_receive_non_project_tasks,
+                    w.can_receive_nonproject_tasks,
                     p.name as position_name
                 FROM worker w
                 LEFT JOIN position p ON w.position_id = p.id
@@ -46,7 +46,7 @@ class WorkerOperations:
     @staticmethod
     def update_worker(db: Database, worker_id, name=None, position_id=None, weekly_hours=None,
                       can_receive_custom_tasks=None,
-                      can_receive_non_project_tasks=None, reminder_day=None, reminder_time=None):
+                      can_receive_nonproject_tasks=None, reminder_day=None, reminder_time=None):
         with db.conn.cursor() as cursor:
             query = "UPDATE worker SET "
             updates = []
@@ -64,9 +64,9 @@ class WorkerOperations:
             if can_receive_custom_tasks is not None:
                 updates.append("can_receive_custom_tasks = %s")
                 params.append(can_receive_custom_tasks)
-            if can_receive_non_project_tasks is not None:
-                updates.append("can_receive_non_project_tasks = %s")
-                params.append(can_receive_non_project_tasks)
+            if can_receive_nonproject_tasks is not None:
+                updates.append("can_receive_nonproject_tasks = %s")
+                params.append(can_receive_nonproject_tasks)
             if reminder_day:
                 updates.append("reminder_day = %s")
                 params.append(reminder_day)
@@ -94,7 +94,7 @@ class WorkerOperations:
                     w.reminder_day,
                     w.reminder_time,
                     w.can_receive_custom_tasks,
-                    w.can_receive_non_project_tasks,
+                    w.can_receive_nonproject_tasks,
                     p.name as position_name
                 FROM worker w
                 LEFT JOIN position p ON w.position_id = p.id
