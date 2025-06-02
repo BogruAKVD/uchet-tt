@@ -8,7 +8,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram_dialog import setup_dialogs
 
-from database import db
+from data.database import db
 from middlewares.database_middleware import DatabaseMiddleware
 from middlewares.message_sender_middleware import MessageSenderMiddleware
 from middlewares.notification_sender_middleware import NotificationSenderMiddleware

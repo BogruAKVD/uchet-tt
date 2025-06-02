@@ -7,6 +7,9 @@ from aiogram_dialog.widgets.input import MessageInput
 from aiogram.types import Message, CallbackQuery
 from aiogram_dialog.widgets.kbd import Select
 
+from data.postition_operations import PositionOperations
+
+
 class CreatePositionState(StatesGroup):
     name = State()
     department_type = State()
@@ -43,7 +46,7 @@ async def create_position(callback: CallbackQuery, widget: Any, dialog_manager: 
 
     db = dialog_manager.middleware_data["db"]
     try:
-        position_id = db.create_position(name=name, department_type=department_type)
+        position_id = PositionOperations.create_position(db, name=name, department_type=department_type)
         await callback.answer(f"Должность '{name}' успешно создана (ID: {position_id})")
     except Exception as e:
         await callback.answer(f"Ошибка при создании должности: {str(e)}")

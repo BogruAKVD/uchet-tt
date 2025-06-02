@@ -7,6 +7,7 @@ from dialogs.worker.create_time_entry import TimeEntryStates, create_time_entry_
 from dialogs.worker.edit_reminder_settings import edit_reminder_settings_dialog, ReminderSettingsStates
 from dialogs.worker.select_projects import select_projects_dialog, ProjectSelectStates
 from dialogs.worker.view_time_entry import ViewTimeEntriesStates, view_time_entries_dialog
+
 from utils import is_worker
 
 
@@ -22,6 +23,8 @@ async def show_main_keyboard(message: types.Message):
             [KeyboardButton(text="Изменить активные проекты")],
             [KeyboardButton(text="Изменить напоминания")],
             [KeyboardButton(text="Просмотреть записи")],
+            # [KeyboardButton(text="Экспортировать таблицу")],
+            # [KeyboardButton(text="Импортировать таблицу")],
         ],
         resize_keyboard=True
     )
@@ -30,13 +33,15 @@ async def show_main_keyboard(message: types.Message):
         reply_markup=keyboard
     )
 
+
 worker_router = Router()
 worker_router.message.filter(WorkerFilter())
 worker_router.include_router(create_time_entry_dialog())
 worker_router.include_router(select_projects_dialog())
 worker_router.include_router(edit_reminder_settings_dialog())
 worker_router.include_router(view_time_entries_dialog())
-
+# worker_router.include_router(get_export_dialog())
+# worker_router.include_router(get_import_dialog())
 
 @worker_router.message(Command("start"))
 async def start(message: types.Message, dialog_manager: DialogManager):
@@ -58,3 +63,11 @@ async def add_time_button(message: types.Message, dialog_manager: DialogManager)
 @worker_router.message(F.text == "Просмотреть записи")
 async def add_time_button(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(ViewTimeEntriesStates.select_period)
+
+# @worker_router.message(F.text == "Экспортировать таблицу")
+# async def add_time_button(message: types.Message, dialog_manager: DialogManager):
+#     await dialog_manager.start()
+
+# @worker_router.message(F.text == "Импортировать таблицу")
+# async def add_time_button(message: types.Message, dialog_manager: DialogManager):
+#     await dialog_manager.start()

@@ -6,6 +6,9 @@ from aiogram_dialog.widgets.input import TextInput
 from aiogram.types import Message
 from typing import Any
 
+from data import font_operations
+from data.font_operations import FontOperations
+from data.task_operations import TaskOperations
 from widgets.Vertical import Select
 
 
@@ -17,8 +20,9 @@ class CreateCustomTaskState(StatesGroup):
 
 async def get_fonts(dialog_manager: DialogManager, **kwargs):
     db = dialog_manager.middleware_data["db"]
+
     return {
-        "fonts": db.get_fonts(),
+        "fonts": FontOperations.get_fonts(db),
     }
 
 
@@ -50,7 +54,7 @@ async def on_confirm(callback: Any, widget: Any, manager: DialogManager):
     task_name = manager.dialog_data["task_name"]
     font_id = manager.dialog_data["font_id"]
 
-    task_id = db.add_custom_task(task_name, font_id)
+    task_id = TaskOperations.add_custom_task(db, task_name, font_id)
 
     if task_id:
         await callback.message.answer(f"Кастомная задача '{task_name}' успешно добавлена!")

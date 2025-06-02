@@ -6,6 +6,7 @@ from aiogram_dialog.widgets.text import Const, Format
 from aiogram_dialog.widgets.input import MessageInput
 from aiogram.types import Message, CallbackQuery
 
+from data.task_operations import TaskOperations
 from widgets.Vertical import Select
 
 
@@ -59,7 +60,7 @@ async def create_task(callback: CallbackQuery, widget: Any, dialog_manager: Dial
 
     db = dialog_manager.middleware_data["db"]
     try:
-        db.create_task(name=name, stage=stage, department_type=department_type)
+        TaskOperations.create_task(db, name=name, stage=stage, department_type=department_type)
         await callback.answer("Задача успешно создана")
     except Exception as e:
         await callback.answer(f"Ошибка при создании задачи: {str(e)}")

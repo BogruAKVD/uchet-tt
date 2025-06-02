@@ -92,38 +92,38 @@ async def get_entry_details(dialog_manager: DialogManager, **kwargs):
 
 
 async def period_selected(callback: CallbackQuery, widget: Select,
-                          manager: DialogManager, item_id: str):
-    manager.dialog_data["period"] = item_id
-    await manager.next()
+                          dialog_manager: DialogManager, item_id: str):
+    dialog_manager.dialog_data["period"] = item_id
+    await dialog_manager.next()
 
 
 async def entry_selected(callback: CallbackQuery, widget: Select,
-                         manager: DialogManager, item_id: str):
-    manager.dialog_data["entry_id"] = int(item_id)
-    await manager.next()
+                         dialog_manager: DialogManager, item_id: str):
+    dialog_manager.dialog_data["entry_id"] = int(item_id)
+    await dialog_manager.next()
 
 
 async def delete_entry(callback: CallbackQuery, button: Button,
-                       manager: DialogManager):
-    db = manager.middleware_data['db']
-    entry_id = manager.dialog_data["entry_id"]
+                       dialog_manager: DialogManager):
+    db = dialog_manager.middleware_data['db']
+    entry_id = dialog_manager.dialog_data["entry_id"]
 
     db.delete_time_entry(entry_id)
-    await manager.back()
+    await dialog_manager.back()
 
 
 async def edit_hours_handler(message: Message, widget: TextInput,
-                             manager: DialogManager, hours: float):
+                             dialog_manager: DialogManager, hours: float):
     try:
         if hours <= 0:
             raise ValueError
 
-        db = manager.middleware_data['db']
-        entry_id = manager.dialog_data["entry_id"]
+        db = dialog_manager.middleware_data['db']
+        entry_id = dialog_manager.dialog_data["entry_id"]
         db.update_time_entry(entry_id, hours)
 
         await message.answer("Время успешно обновлено!")
-        await manager.switch_to(ViewTimeEntriesStates.entry_actions)
+        await dialog_manager.switch_to(ViewTimeEntriesStates.entry_actions)
     except ValueError:
         await message.answer("Пожалуйста, введите корректное число часов (больше 0)")
 

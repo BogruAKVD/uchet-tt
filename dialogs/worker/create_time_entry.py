@@ -5,6 +5,10 @@ from aiogram_dialog.widgets.kbd import Button, Cancel, Back
 from aiogram_dialog.widgets.text import Const, Format
 from aiogram_dialog.widgets.input import TextInput
 
+from data.project_operations import ProjectOperations
+from data.task_operations import TaskOperations
+from data.time_entry_operations import TimeEntryOperations
+from data.worker_operations import WorkerOperations
 from widgets.Vertical import Select
 
 
@@ -18,12 +22,12 @@ class TimeEntryStates(StatesGroup):
 async def get_active_projects(dialog_manager: DialogManager, **kwargs):
     db = dialog_manager.middleware_data['db']
     telegram_id = dialog_manager.event.from_user.id
-    worker = db.get_worker_by_telegram_id(telegram_id)
+    worker = WorkerOperations.get_worker_by_telegram_id(db, telegram_id)
 
-    active_projects = db.get_worker_active_projects_full(worker['id'])
+    active_projects = WorkerOperations.get_worker_active_projects_full(db, worker['id'])
 
     if worker.get('can_receive_custom_tasks', False):
-        custom_project = db.get_custom_project()
+        custom_project = ProjectOperations.get_custom_project(db)
         active_projects.insert(0, custom_project)
 
 
@@ -36,34 +40,34 @@ async def get_project_tasks(dialog_manager: DialogManager, **kwargs):
     db = dialog_manager.middleware_data['db']
     project_id = dialog_manager.dialog_data.get("project_id")
 
-    project_tasks = db.get_tasks_for_project(project_id)
+    project_tasks = ProjectOperations.get_tasks_for_project(db, project_id)
 
     return {
         "project_tasks": project_tasks,
-        "project_name": db.get_project_name(project_id)
+        "project_name": ProjectOperations.get_project_name(db, project_id)
     }
 
 
 async def project_selected(callback: CallbackQuery, widget: Select,
-                           manager: DialogManager, item_id: str):
-    manager.dialog_data["project_id"] = int(item_id)
-    await manager.next()
+                           dialog_manager: DialogManager, item_id: str):
+    dialog_manager.dialog_data["project_id"] = int(item_id)
+    await dialog_manager.next()
 
 
 async def task_selected(callback: CallbackQuery, widget: Select,
-                        manager: DialogManager, item_id: str):
-    manager.dialog_data["project_task_id"] = int(item_id)
-    await manager.next()
+                        dialog_manager: DialogManager, item_id: str):
+    dialog_manager.dialog_data["project_task_id"] = int(item_id)
+    await dialog_manager.next()
 
 
 async def hours_entered(message: Message, widget: TextInput,
-                        manager: DialogManager, hours: str):
+                        dialog_manager: DialogManager, hours: str):
     try:
         hours_float = float(hours)
         if hours_float <= 0:
             raise ValueError
-        manager.dialog_data["hours"] = hours_float
-        await manager.next()
+        dialog_manager.dialog_data["hours"] = hours_float
+        await dialog_manager.next()
     except ValueError:
         await message.answer("Пожалуйста, введите корректное число часов (больше 0)")
 
@@ -73,7 +77,7 @@ async def get_confirmation_data(dialog_manager: DialogManager, **kwargs):
     project_task_id = dialog_manager.dialog_data.get("project_task_id")
     hours = dialog_manager.dialog_data.get("hours")
 
-    project_task_info = db.get_project_task_info(project_task_id)
+    project_task_info = TaskOperations.get_project_task_info(db, project_task_id)
 
     return {
         "project_name": project_task_info['project_name'],
@@ -85,27 +89,27 @@ async def get_confirmation_data(dialog_manager: DialogManager, **kwargs):
 
 
 async def save_time_entry(callback: CallbackQuery, button: Button,
-                          manager: DialogManager):
-    db = manager.middleware_data['db']
-    notification_sender = manager.middleware_data['notification_sender']
-    telegram_id = manager.event.from_user.id
-    worker = db.get_worker_by_telegram_id(telegram_id)
+                          dialog_manager: DialogManager):
+    db = dialog_manager.middleware_data['db']
+    notification_sender = dialog_manager.middleware_data['notification_sender']
+    telegram_id = dialog_manager.event.from_user.id
+    worker = WorkerOperations.get_worker_by_telegram_id(db, telegram_id)
 
     time_entry_data = {
-        "project_task_id": manager.dialog_data["project_task_id"],
+        "project_task_id": dialog_manager.dialog_data["project_task_id"],
         "worker_id": worker['id'],
-        "hours": manager.dialog_data["hours"]
+        "hours": dialog_manager.dialog_data["hours"]
     }
 
     try:
-        db.add_time_entry(time_entry_data)
+        TimeEntryOperations.add_time_entry(db, time_entry_data)
         await notification_sender.on_data_changed(worker['id'])
 
         await callback.message.answer("Время успешно сохранено!")
     except Exception as e:
         await callback.message.answer(f"Ошибка при сохранении: {str(e)}")
 
-    await manager.done()
+    await dialog_manager.done()
 
 
 def create_time_entry_dialog():

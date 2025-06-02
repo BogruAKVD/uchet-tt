@@ -6,6 +6,7 @@ from aiogram_dialog.widgets.text import Const, Format
 from aiogram_dialog.widgets.input import MessageInput
 from aiogram.types import Message, CallbackQuery
 
+from data.worker_operations import WorkerOperations
 from widgets.Vertical import Multiselect
 
 
@@ -17,7 +18,7 @@ class SendMessageState(StatesGroup):
 
 async def workers_getter(dialog_manager: DialogManager, **kwargs):
     db = dialog_manager.middleware_data["db"]
-    workers = db.get_all_workers()
+    workers = WorkerOperations.get_all_workers(db)
 
     return {
         "workers": workers,
@@ -29,7 +30,7 @@ async def message_getter(dialog_manager: DialogManager, **kwargs):
     db = dialog_manager.middleware_data["db"]
     data = dialog_manager.current_context().dialog_data
     selected_workers = data.get("selected_workers", [])
-    workers = db.get_all_workers()
+    workers = WorkerOperations.get_all_workers(db)
     message_text = data.get("message_text", "Не указано")
 
     selected_workers_names = [

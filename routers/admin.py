@@ -9,6 +9,7 @@ from dialogs.admin.create_project import CreateProjectState, create_project_dial
 from dialogs.admin.create_task import CreateTaskState, create_task_dialog
 from dialogs.admin.create_worker import create_worker_dialog, CreateWorkerState
 from dialogs.admin.edit_worker import edit_worker_dialog, EditWorkerState
+from dialogs.admin.get_tables import get_tables_dialog, GetTablesState
 from dialogs.admin.send_message import send_message_dialog, SendMessageState
 from utils import is_admin
 
@@ -28,6 +29,7 @@ async def show_main_keyboard(message: types.Message):
             [KeyboardButton(text="Создать должность")],
             [KeyboardButton(text="Редактировать сотрудника")],
             [KeyboardButton(text="Отправить сообщение")],
+            [KeyboardButton(text="Получить таблицы")],
         ],
         resize_keyboard=True
     )
@@ -46,6 +48,8 @@ admin_router.include_router(create_worker_dialog())
 admin_router.include_router(create_position_dialog())
 admin_router.include_router(edit_worker_dialog())
 admin_router.include_router(send_message_dialog())
+admin_router.include_router(get_tables_dialog())
+
 
 
 @admin_router.message(Command("start"))
@@ -80,4 +84,8 @@ async def create_task_handler(message: types.Message, dialog_manager: DialogMana
 @admin_router.message(F.text == "Отправить сообщение")
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(SendMessageState.select_workers, mode=StartMode.RESET_STACK)
-    
+
+@admin_router.message(F.text == "Получить таблицы")
+async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
+    await dialog_manager.start(GetTablesState.main, mode=StartMode.RESET_STACK)
+

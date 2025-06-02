@@ -5,7 +5,13 @@ from typing import Dict
 from aiogram import Bot
 import asyncio
 
-from database import Database, db
+from data.database import Database
+from data.project_operations import ProjectOperations
+from data.task_operations import TaskOperations
+from data.time_entry_operations import TimeEntryOperations
+from data.worker_operations import WorkerOperations
+
+
 from message_sender import MessageSender
 
 
@@ -19,7 +25,7 @@ class NotificationSender:
         self.active_workers: Dict[int, asyncio.Task] = {}
 
     async def start(self):
-        workers = self.db.get_all_workers()
+        workers = WorkerOperations.get_all_workers(self.db)
         for worker in workers:
             self._setup_worker_schedule(worker)
 
@@ -79,8 +85,7 @@ class NotificationSender:
         print("-" * 40)
 
     async def _send_weekly_report(self, worker_id: int):
-        """Sends weekly report to worker"""
-        worker = self.db.get_worker(worker_id)
+        worker = WorkerOperations.get_worker(self.db, worker_id)
         if not worker:
             print("Worker not found")
             return
@@ -101,7 +106,8 @@ class NotificationSender:
 
     async def _generate_report(self, worker_id: int, start_date: datetime,
                                end_date: datetime) -> str:
-        all_time_entries = self.db.get_time_entries(
+        all_time_entries = TimeEntryOperations.get_time_entries(
+            self.db,
             worker_id,
             start_date=start_date,
             end_date=end_date
@@ -113,7 +119,7 @@ class NotificationSender:
         for entry in all_time_entries:
             project_id = entry['project_id']
             if project_id not in projects_data:
-                project = self.db.get_project(project_id)
+                project = ProjectOperations.get_project(self.db, project_id)
                 projects_data[project_id] = {
                     'name': project['name'],
                     'total_hours': 0,
@@ -122,7 +128,7 @@ class NotificationSender:
 
             task_id = entry['task_id']
             if task_id not in projects_data[project_id]['tasks']:
-                task = self.db.get_task(task_id)
+                task = TaskOperations.get_task(self.db, task_id)
                 projects_data[project_id]['tasks'][task_id] = {
                     'name': task['name'],
                     'font_name': entry.get('font_name', ''),
@@ -160,7 +166,7 @@ class NotificationSender:
             print(f"Failed to send message to {telegram_id}: {e}")
 
     async def on_data_changed(self, worker_id: int):
-        worker = self.db.get_worker(worker_id)
+        worker = WorkerOperations.get_worker(self.db, worker_id)
         self._setup_worker_schedule(worker)
         await self._send_weekly_report(worker_id)
 

@@ -8,6 +8,8 @@ from aiogram_dialog.widgets.input import MessageInput
 from aiogram.types import Message, CallbackQuery
 from aiogram_dialog.widgets.kbd import Select
 
+from data.postition_operations import PositionOperations
+from data.worker_operations import WorkerOperations
 from widgets.RequestUser import RequestUser
 from widgets.Vertical import Multiselect
 
@@ -29,7 +31,7 @@ async def worker_getter(dialog_manager: DialogManager, **kwargs):
     department = data.get("department")
     position_id = data.get("position_id")
 
-    all_positions = db.get_all_positions()
+    all_positions = PositionOperations.get_all_positions(db)
 
     positions = []
     if department:
@@ -119,14 +121,14 @@ async def create_worker(callback: CallbackQuery, widget: Any, dialog_manager: Di
     db = dialog_manager.middleware_data["db"]
 
     try:
-        worker_id = db.create_worker(
-            name=data["name"],
-            telegram_id=data["telegram_id"],
-            position_id=data["position_id"],
-            weekly_hours=data["weekly_hours"],
-            can_receive_custom_tasks=data.get("can_receive_custom_tasks", False),
-            can_receive_non_project_tasks=data.get("can_receive_non_project_tasks", False)
-        )
+        worker_id = WorkerOperations.create_worker(db,
+                                  name=data["name"],
+                                  telegram_id=data["telegram_id"],
+                                  position_id=data["position_id"],
+                                  weekly_hours=data["weekly_hours"],
+                                  can_receive_custom_tasks=data.get("can_receive_custom_tasks", False),
+                                  can_receive_non_project_tasks=data.get("can_receive_non_project_tasks", False)
+                                  )
         await callback.answer(f"Сотрудник успешно добавлен (ID: {worker_id})")
     except Exception as e:
         await callback.answer(f"Ошибка при добавлении сотрудника: {str(e)}")

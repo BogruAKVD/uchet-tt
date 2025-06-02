@@ -1,7 +1,7 @@
 from typing import Any
 from aiogram import BaseMiddleware, Bot
 from aiogram.types import TelegramObject
-from database import Database
+from data.database import Database
 from message_sender import MessageSender
 from notififcation_sender import NotificationSender
 

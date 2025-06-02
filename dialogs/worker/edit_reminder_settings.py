@@ -6,6 +6,7 @@ from aiogram_dialog.widgets.text import Const, Format
 from aiogram_dialog.widgets.input import TextInput
 from datetime import time
 
+from data.worker_operations import WorkerOperations
 from widgets.Vertical import Select
 
 
@@ -26,9 +27,10 @@ async def get_days_of_week(dialog_manager: DialogManager, **kwargs):
         {"value": "воскресенье", "label": "Воскресенье"},
     ]
 
-    worker = dialog_manager.middleware_data['db'].get_worker_by_telegram_id(
-        dialog_manager.event.from_user.id
-    )
+    db = dialog_manager.middleware_data['db']
+    telegram_id = dialog_manager.event.from_user.id
+
+    worker = WorkerOperations.get_worker_by_telegram_id(db, telegram_id)
     current_day = worker.get('reminder_day', 'пятница')
 
     return {
@@ -44,9 +46,10 @@ async def on_day_selected(callback: CallbackQuery, widget: Select,
 
 
 async def get_time_input(dialog_manager: DialogManager, **kwargs):
-    worker = dialog_manager.middleware_data['db'].get_worker_by_telegram_id(
-        dialog_manager.event.from_user.id
-    )
+    db = dialog_manager.middleware_data['db']
+    telegram_id = dialog_manager.event.from_user.id
+
+    worker = WorkerOperations.get_worker_by_telegram_id(db, telegram_id)
     current_time = worker.get('reminder_time', time(17, 0)).strftime("%H:%M")
 
     return {
@@ -79,14 +82,16 @@ async def get_confirmation_data(dialog_manager: DialogManager, **kwargs):
 async def on_confirmation(callback: CallbackQuery, button: Button, dialog_manager: DialogManager):
     db = dialog_manager.middleware_data['db']
     notification_sender = dialog_manager.middleware_data['notification_sender']
+
     telegram_id = dialog_manager.event.from_user.id
-    worker = db.get_worker_by_telegram_id(telegram_id)
+    worker = WorkerOperations.get_worker_by_telegram_id(db, telegram_id)
 
     selected_day = dialog_manager.dialog_data['selected_day']
     selected_time = dialog_manager.dialog_data['selected_time']
 
     if selected_day and selected_time:
-        db.update_worker_reminder_settings(
+        WorkerOperations.update_worker_reminder_settings(
+            db,
             worker['id'],
             day=selected_day,
             time=selected_time
