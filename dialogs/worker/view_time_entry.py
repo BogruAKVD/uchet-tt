@@ -6,6 +6,11 @@ from aiogram_dialog.widgets.text import Const, Format
 from aiogram_dialog.widgets.input import TextInput
 from datetime import datetime, timedelta, date
 
+from data.font_operations import FontOperations
+from data.project_operations import ProjectOperations
+from data.task_operations import TaskOperations
+from data.time_entry_operations import TimeEntryOperations
+from data.worker_operations import WorkerOperations
 from widgets.Vertical import Select
 
 
@@ -30,28 +35,28 @@ async def get_time_periods(dialog_manager: DialogManager, **kwargs):
 async def get_time_entries(dialog_manager: DialogManager, **kwargs):
     db = dialog_manager.middleware_data['db']
     telegram_id = dialog_manager.event.from_user.id
-    worker = db.get_worker_by_telegram_id(telegram_id)
-    period = dialog_manager.dialog_data.get("period", "week")
+    worker = WorkerOperations.get_worker_by_telegram_id(db, telegram_id)
+    period = dialog_manager.dialog_data.get("period")
 
-    today = date.today()
+    today = datetime.today()
 
     if period == "today":
-        start_date = today
-        entries = db.get_time_entries(worker['id'], start_date=start_date)
+        start_date = today - timedelta(days=1)
+        entries = TimeEntryOperations.get_time_entries(db, worker['id'], start_date=start_date)
     elif period == "week":
         start_date = today - timedelta(days=today.weekday())
-        entries = db.get_time_entries(worker['id'], start_date=start_date)
+        entries = TimeEntryOperations.get_time_entries(db, worker['id'], start_date=start_date)
     elif period == "month":
-        start_date = date(today.year, today.month, 1)
-        entries = db.get_time_entries(worker['id'], start_date=start_date)
+        start_date = datetime(today.year, today.month, 1)
+        entries = TimeEntryOperations.get_time_entries(db, worker['id'], start_date=start_date)
     else:
-        entries = db.get_time_entries(worker['id'])
+        entries = TimeEntryOperations.get_time_entries(db, worker['id'])
 
     formatted_entries = []
     for entry in entries:
-        project_name = db.get_project_name(entry['project_id'])
-        task_name = db.get_task_name(entry['task_id'])
-        font_name = db.get_font_name(entry['font_id'])  # Assuming you have this method
+        project_name = ProjectOperations.get_project_name(db, entry['project_id'])
+        task_name = TaskOperations.get_task_name(db, entry['task_id'])
+        font_name = FontOperations.get_font_name(db, entry['font_id'])
 
         entry_date = entry['entry_date']
         if isinstance(entry_date, str):
@@ -74,10 +79,10 @@ async def get_entry_details(dialog_manager: DialogManager, **kwargs):
     db = dialog_manager.middleware_data['db']
     entry_id = dialog_manager.dialog_data["entry_id"]
 
-    entry = db.get_time_entry(entry_id)
-    project_name = db.get_project_name(entry['project_id'])
-    task_name = db.get_task_name(entry['task_id'])
-    font_name = db.get_font_name(entry['font_id'])
+    entry = TimeEntryOperations.get_time_entry(db, entry_id)
+    project_name = ProjectOperations.get_project_name(db, entry['project_id'])
+    task_name = TaskOperations.get_task_name(db, entry['task_id'])
+    font_name = FontOperations.get_font_name(db, entry['font_id'])
 
     entry_date = entry['entry_date']
     if isinstance(entry_date, str):
@@ -108,7 +113,7 @@ async def delete_entry(callback: CallbackQuery, button: Button,
     db = dialog_manager.middleware_data['db']
     entry_id = dialog_manager.dialog_data["entry_id"]
 
-    db.delete_time_entry(entry_id)
+    TimeEntryOperations.delete_time_entry(db, entry_id)
     await dialog_manager.back()
 
 
@@ -120,7 +125,7 @@ async def edit_hours_handler(message: Message, widget: TextInput,
 
         db = dialog_manager.middleware_data['db']
         entry_id = dialog_manager.dialog_data["entry_id"]
-        db.update_time_entry(entry_id, hours)
+        TimeEntryOperations.update_time_entry(db, entry_id, hours)
 
         await message.answer("Время успешно обновлено!")
         await dialog_manager.switch_to(ViewTimeEntriesStates.entry_actions)

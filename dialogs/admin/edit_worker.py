@@ -83,7 +83,6 @@ async def confirm_getter(dialog_manager: DialogManager, **kwargs):
     position_items = worker_data.get("position_items", [])
     project_items = worker_data.get("project_items", [])
 
-    # Получаем новые значения
     new_name = data.get("new_name")
     new_position_id = data.get("new_position_id")
     new_weekly_hours = data.get("new_weekly_hours")
@@ -91,17 +90,14 @@ async def confirm_getter(dialog_manager: DialogManager, **kwargs):
     new_non_project_tasks = data.get("new_can_receive_non_project_tasks")
     new_project_ids = data.get("new_project_ids", [])
 
-    # Получаем текущие значения
     current_name = worker_data.get("worker", {}).get("name")
     current_position = worker_data.get("current_position")
     current_hours = worker_data.get("weekly_hours")
     current_permissions = worker_data.get("permissions", [])
     current_projects = worker_data.get("worker_projects", [])
 
-    # Формируем строку изменений
     changes = []
 
-    # Проверяем изменения для каждого поля
     if new_name is not None and new_name != current_name:
         changes.append(f"ФИО: {current_name} → {new_name}")
 

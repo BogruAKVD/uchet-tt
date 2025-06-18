@@ -86,9 +86,9 @@ async def create_task_handler(message: types.Message, dialog_manager: DialogMana
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(CreatePositionState.name, mode=StartMode.RESET_STACK)
 
-@admin_router.message(F.text == "Редактировать сотрудника")
-async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
-    await dialog_manager.start(EditWorkerState.select_worker, mode=StartMode.RESET_STACK)
+# @admin_router.message(F.text == "Редактировать сотрудника")
+# async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
+#     await dialog_manager.start(EditWorkerState.select_worker, mode=StartMode.RESET_STACK)
 
 @admin_router.message(F.text == "Отправить сообщение")
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):

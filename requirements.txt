@@ -5,3 +5,4 @@ psycopg2-binary
 aiogram-dialog
 apscheduler
 pandas
+xlsxwriter

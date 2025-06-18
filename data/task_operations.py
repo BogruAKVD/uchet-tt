@@ -52,6 +52,18 @@ class TaskOperations:
             return [dict(row) for row in cursor.fetchall()]
 
     @staticmethod
+    def get_task_name(db: Database, task_id):
+        with db.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute(
+                "SELECT name FROM task WHERE id = %s",
+                (task_id,)
+            )
+            result = dict(cursor.fetchone())
+            print(result)
+            return result
+
+
+    @staticmethod
     def get_project_task_info(db: Database, project_task_id):
         with db.conn.cursor(cursor_factory=DictCursor) as cursor:
             cursor.execute("""

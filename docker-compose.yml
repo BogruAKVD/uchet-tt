@@ -9,13 +9,13 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_DB}
     ports:
-      - "5432:5432"
+      - "5455:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   bot:
     build: .
-    container_name: bnmmnb456654/uchet-tt_bot
+    container_name: uchet-tt_bot
     depends_on:
       - db
     environment:

@@ -60,7 +60,6 @@ async def get_time_input(dialog_manager: DialogManager, **kwargs):
 async def on_time_entered(message: Message, widget: TextInput,
                           dialog_manager: DialogManager, time_str: str):
     try:
-        # Validate time format
         hours, minutes = map(int, time_str.split(':'))
         if not (0 <= hours < 24 and 0 <= minutes < 60):
             raise ValueError

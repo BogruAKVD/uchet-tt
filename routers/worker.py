@@ -5,6 +5,8 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
 from dialogs.worker.create_time_entry import TimeEntryStates, create_time_entry_dialog
 from dialogs.worker.edit_reminder_settings import edit_reminder_settings_dialog, ReminderSettingsStates
+from dialogs.worker.export_time_table import export_time_table_dialog, ExportTimeTableStates
+from dialogs.worker.import_time_table import import_time_table_dialog, ImportTimeTableStates
 from dialogs.worker.select_projects import select_projects_dialog, ProjectSelectStates
 from dialogs.worker.view_time_entry import ViewTimeEntriesStates, view_time_entries_dialog
 
@@ -23,8 +25,8 @@ async def show_main_keyboard(message: types.Message):
             [KeyboardButton(text="Изменить активные проекты")],
             [KeyboardButton(text="Изменить напоминания")],
             [KeyboardButton(text="Просмотреть записи")],
-            # [KeyboardButton(text="Экспортировать таблицу")],
-            # [KeyboardButton(text="Импортировать таблицу")],
+            [KeyboardButton(text="Экспортировать таблицу")],
+            [KeyboardButton(text="Импортировать таблицу")],
         ],
         resize_keyboard=True
     )
@@ -40,8 +42,8 @@ worker_router.include_router(create_time_entry_dialog())
 worker_router.include_router(select_projects_dialog())
 worker_router.include_router(edit_reminder_settings_dialog())
 worker_router.include_router(view_time_entries_dialog())
-# worker_router.include_router(get_export_dialog())
-# worker_router.include_router(get_import_dialog())
+worker_router.include_router(export_time_table_dialog())
+worker_router.include_router(import_time_table_dialog())
 
 @worker_router.message(Command("start"))
 async def start(message: types.Message, dialog_manager: DialogManager):
@@ -64,10 +66,10 @@ async def add_time_button(message: types.Message, dialog_manager: DialogManager)
 async def add_time_button(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(ViewTimeEntriesStates.select_period)
 
-# @worker_router.message(F.text == "Экспортировать таблицу")
-# async def add_time_button(message: types.Message, dialog_manager: DialogManager):
-#     await dialog_manager.start()
+@worker_router.message(F.text == "Экспортировать таблицу")
+async def add_time_button(message: types.Message, dialog_manager: DialogManager):
+    await dialog_manager.start(ExportTimeTableStates.processing)
 
-# @worker_router.message(F.text == "Импортировать таблицу")
-# async def add_time_button(message: types.Message, dialog_manager: DialogManager):
-#     await dialog_manager.start()
+@worker_router.message(F.text == "Импортировать таблицу")
+async def add_time_button(message: types.Message, dialog_manager: DialogManager):
+    await dialog_manager.start(ImportTimeTableStates.upload)

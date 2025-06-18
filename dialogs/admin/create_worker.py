@@ -32,7 +32,6 @@ async def worker_getter(dialog_manager: DialogManager, **kwargs):
 
     all_positions = PositionOperations.get_all_positions(db)
 
-    positions = []
     if department:
         positions = [p for p in all_positions if p['department'] == department]
     else:
