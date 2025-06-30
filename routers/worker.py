@@ -52,7 +52,7 @@ async def start(message: types.Message, dialog_manager: DialogManager):
 
 @worker_router.message(F.text == "Добавить время")
 async def add_time_button(message: types.Message, dialog_manager: DialogManager):
-    await dialog_manager.start(TimeEntryStates.select_project)
+    await dialog_manager.start(TimeEntryStates.select_date)
 
 @worker_router.message(F.text == "Изменить активные проекты")
 async def add_time_button(message: types.Message, dialog_manager: DialogManager):

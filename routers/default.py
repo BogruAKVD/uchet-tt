@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import Router, types, F
 from aiogram.filters import Command, BaseFilter
 from aiogram_dialog import DialogManager, StartMode
@@ -18,6 +20,7 @@ default_router = Router()
 
 @default_router.message()
 async def start(message: types.Message, dialog_manager: DialogManager):
+    logging.info(f"User {message.from_user.id} постучался")
     await message.answer("Извините, но вы не являетесь сотрудником или администратором. "
                          "Если вам нужен доступ к системе, пожалуйста, обратитесь к администратору.")
 

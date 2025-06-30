@@ -99,18 +99,20 @@ class Database:
         """)
 
         #Проекты для непроектных и кастомных задач
+        cursor.execute("""
+            INSERT INTO project (name, type, status)
+            SELECT 'Для кастомных задач', 'для кастомов', 'в работе'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM project WHERE type = 'для кастомов'
+            );
+        """)
 
         cursor.execute("""
             INSERT INTO project (name, type, status)
-            VALUES 
-            ('Для кастомных задач', 'для кастомов', 'в работе')
-            ON CONFLICT DO NOTHING;
-        """)
-        cursor.execute("""
-            INSERT INTO project (name, type, status)
-            VALUES 
-            ('Для непроектных задач', 'для непроектных', 'в работе')
-            ON CONFLICT DO NOTHING;
+            SELECT 'Для непроектных задач', 'для непроектных', 'в работе'
+            WHERE NOT EXISTS (
+                SELECT 1 FROM project WHERE type = 'для непроектных'
+            );
         """)
 
 

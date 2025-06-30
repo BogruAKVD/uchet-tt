@@ -46,10 +46,11 @@ class TimeEntryOperations:
     def add_time_entry(db: Database, time_entry_data):
         with db.conn.cursor() as cursor:
             cursor.execute(
-                """INSERT INTO time_entry (project_task_id, worker_id, hours, comment) 
-                VALUES (%s, %s, %s, %s)""",
+                """INSERT INTO time_entry (project_task_id, worker_id, entry_date, hours, comment) 
+                VALUES (%s, %s, %s, %s, %s)""",
                 (time_entry_data["project_task_id"],
                  time_entry_data["worker_id"],
+                 time_entry_data["entry_date"],
                  time_entry_data["hours"],
                  time_entry_data.get("comment")))
             db.conn.commit()

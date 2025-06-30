@@ -1,9 +1,10 @@
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import CallbackQuery, Message
 from aiogram_dialog import Dialog, Window, DialogManager
-from aiogram_dialog.widgets.kbd import Button, Cancel, Back
+from aiogram_dialog.widgets.kbd import Button, Cancel, Back, Calendar, CalendarConfig
 from aiogram_dialog.widgets.text import Const, Format
 from aiogram_dialog.widgets.input import TextInput
+from datetime import date, datetime, timezone, timedelta
 
 from data.project_operations import ProjectOperations
 from data.task_operations import TaskOperations
@@ -15,6 +16,7 @@ from widgets.Vertical import Select
 class TimeEntryStates(StatesGroup):
     select_project = State()
     select_task = State()
+    select_date = State()
     enter_hours = State()
     enter_comment = State()
     confirmation = State()
@@ -64,6 +66,12 @@ async def task_selected(callback: CallbackQuery, widget: Select,
     await dialog_manager.next()
 
 
+async def date_selected(callback: CallbackQuery, widget: Calendar,
+                       dialog_manager: DialogManager, selected_date: date):
+    dialog_manager.dialog_data["entry_date"] = selected_date.isoformat()
+    await dialog_manager.next()
+
+
 async def hours_entered(message: Message, widget: TextInput,
                         dialog_manager: DialogManager, hours: str):
     try:
@@ -86,6 +94,7 @@ async def get_confirmation_data(dialog_manager: DialogManager, **kwargs):
     db = dialog_manager.middleware_data['db']
     project_task_id = dialog_manager.dialog_data.get("project_task_id")
     project_task_info = TaskOperations.get_project_task_info(db, project_task_id)
+    entry_date = datetime.strptime(dialog_manager.dialog_data["entry_date"], "%Y-%m-%d").date()
 
     return {
         "project_name": project_task_info['project_name'],
@@ -93,7 +102,8 @@ async def get_confirmation_data(dialog_manager: DialogManager, **kwargs):
         "font_name": project_task_info.get('font_name', 'Не указан'),
         "project_task_id": project_task_id,
         "hours": dialog_manager.dialog_data.get("hours"),
-        "comment": dialog_manager.dialog_data.get("comment", 'Не указан')
+        "comment": dialog_manager.dialog_data.get("comment", 'Не указан'),
+        "entry_date": entry_date.strftime("%d.%m.%Y")
     }
 
 
@@ -108,7 +118,8 @@ async def save_time_entry(callback: CallbackQuery, button: Button,
         "project_task_id": dialog_manager.dialog_data["project_task_id"],
         "worker_id": worker['id'],
         "hours": dialog_manager.dialog_data["hours"],
-        "comment": dialog_manager.dialog_data.get("comment", None)
+        "comment": dialog_manager.dialog_data.get("comment", None),
+        "entry_date": dialog_manager.dialog_data["entry_date"]
     }
 
     try:
@@ -125,7 +136,21 @@ async def save_time_entry(callback: CallbackQuery, button: Button,
 def create_time_entry_dialog():
     return Dialog(
         Window(
-            Const("Выберите проект:"),
+            Const("Выберите дату для учета времени:"),
+            Calendar(
+                id="calendar",
+                on_click=date_selected,
+                config=CalendarConfig(
+                    timezone=timezone(timedelta(hours=3)),
+                    firstweekday=0
+                )
+            ),
+            Back(Const("⬅️ Назад")),
+            Cancel(Const("❌ Отмена")),
+            state=TimeEntryStates.select_date
+        ),
+        Window(
+            Const("Выберfffите проект:"),
             Select(
                 text=Format("{item[name]}"),
                 id="s_projects",
@@ -175,6 +200,7 @@ def create_time_entry_dialog():
         ),
         Window(
             Format("Подтвердите ввод времени:\n\n"
+                   "Дата: {entry_date}\n"
                    "Проект: {project_name}\n"
                    "Задача: {task_name}\n"
                    "Шрифт: {font_name}\n"

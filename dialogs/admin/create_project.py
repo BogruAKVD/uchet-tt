@@ -256,8 +256,6 @@ def create_project_dialog():
                 items=[
                     ("плановый", "Плановый"),
                     ("клиентский", "Клиентский"),
-                    # ("кастом", "Кастом"),
-                    # ("непроектный", "Непроектный"),
                 ],
                 id="project_type_select",
                 item_id_getter=lambda x: x[0],

@@ -9,6 +9,7 @@ from dialogs.admin.create_position import create_position_dialog, CreatePosition
 from dialogs.admin.create_project import CreateProjectState, create_project_dialog
 from dialogs.admin.create_task import CreateTaskState, create_task_dialog
 from dialogs.admin.create_worker import create_worker_dialog, CreateWorkerState
+from dialogs.admin.edit_project import edit_project_dialog, EditProjectState
 from dialogs.admin.edit_worker import edit_worker_dialog, EditWorkerState
 from dialogs.admin.get_tables import get_tables_dialog, GetTablesState
 from dialogs.admin.get_time_entries import get_time_entries_dialog, TimeEntryExportState
@@ -28,6 +29,7 @@ async def show_main_keyboard(message: types.Message):
             [KeyboardButton(text="Создать задачу")],
             [KeyboardButton(text="Создать кастом")],
             [KeyboardButton(text="Создать непроектную задачу")],
+            [KeyboardButton(text="Редактировать проект")],
             [KeyboardButton(text="Создать сотрудника")],
             [KeyboardButton(text="Создать должность")],
             [KeyboardButton(text="Редактировать сотрудника")],
@@ -49,6 +51,7 @@ admin_router.include_router(create_project_dialog())
 admin_router.include_router(create_task_dialog())
 admin_router.include_router(create_custom_task_dialog())
 admin_router.include_router(create_nonproject_task_dialog())
+admin_router.include_router(edit_project_dialog())
 admin_router.include_router(create_worker_dialog())
 admin_router.include_router(create_position_dialog())
 admin_router.include_router(edit_worker_dialog())
@@ -77,6 +80,10 @@ async def create_task_handler(message: types.Message, dialog_manager: DialogMana
 @admin_router.message(F.text == "Создать непроектную задачу")
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):
     await dialog_manager.start(CreateNonProjectTaskState.select_department, mode=StartMode.RESET_STACK)
+
+@admin_router.message(F.text == "Редактировать проект")
+async def edit_project_handler(message: types.Message, dialog_manager: DialogManager):
+    await dialog_manager.start(EditProjectState.select_project, mode=StartMode.RESET_STACK)
 
 @admin_router.message(F.text == "Создать сотрудника")
 async def create_task_handler(message: types.Message, dialog_manager: DialogManager):

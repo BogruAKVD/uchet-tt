@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from psycopg2.extras import DictCursor
 
 from data.task_operations import TaskOperations
@@ -109,6 +109,56 @@ class ProjectOperations:
             return cursor.fetchall()
 
     @staticmethod
+    def get_active_projects(db: Database) -> List[Dict[str, Any]]:
+        with db.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""
+                SELECT id, name, type, status 
+                FROM project 
+                WHERE status = 'в работе'
+                ORDER BY name
+            """)
+            return [dict(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def get_project_by_id(db: Database, project_id: int) -> Dict[str, Any]:
+        with db.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""
+                SELECT id, name, type, status 
+                FROM project 
+                WHERE id = %s
+            """, (project_id,))
+            result = cursor.fetchone()
+            return dict(result) if result else None
+
+    @staticmethod
+    def get_project_tasks(db: Database, project_id: int) -> List[Dict[str, Any]]:
+        with db.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""
+                SELECT 
+                    pt.id,
+                    t.name,
+                    t.stage,
+                    t.department,
+                    pt.status,
+                    f.name as font_name
+                FROM project_task pt
+                JOIN task t ON pt.task_id = t.id
+                LEFT JOIN font f ON pt.font_id = f.id
+                WHERE pt.project_id = %s
+                ORDER BY t.stage, t.department, t.name
+            """, (project_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def get_project_task(db: Database, project_task_id: int) -> Dict[str, Any]:
+        with db.conn.cursor(cursor_factory=DictCursor) as cursor:
+            cursor.execute("""
+                SELECT id, status FROM project_task WHERE id = %s
+            """, (project_task_id,))
+            result = cursor.fetchone()
+            return dict(result) if result else None
+
+    @staticmethod
     def get_project_name(db: Database, project_id: int) -> str:
         with db.conn.cursor() as cursor:
             try:
@@ -163,3 +213,150 @@ class ProjectOperations:
                 ORDER BY p.name
             """, (worker_id,))
             return [dict(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def get_project_tasks_by_stage(db: Database, project_id: int, stage: Optional[str]) -> List[Dict[str, Any]]:
+        with db.conn.cursor(cursor_factory=DictCursor) as cursor:
+            if stage is None:
+                cursor.execute("""
+                        SELECT 
+                            pt.id,
+                            t.name,
+                            t.stage,
+                            t.department,
+                            pt.status,
+                            f.name as font_name
+                        FROM project_task pt
+                        JOIN task t ON pt.task_id = t.id
+                        LEFT JOIN font f ON pt.font_id = f.id
+                        WHERE pt.project_id = %s AND t.stage IS NULL
+                        ORDER BY t.department, t.name
+                    """, (project_id,))
+            else:
+                cursor.execute("""
+                        SELECT 
+                            pt.id,
+                            t.name,
+                            t.stage,
+                            t.department,
+                            pt.status,
+                            f.name as font_name
+                        FROM project_task pt
+                        JOIN task t ON pt.task_id = t.id
+                        LEFT JOIN font f ON pt.font_id = f.id
+                        WHERE pt.project_id = %s AND t.stage = %s
+                        ORDER BY t.department, t.name
+                    """, (project_id, stage))
+            return [dict(row) for row in cursor.fetchall()]
+
+    @staticmethod
+    def complete_task(db: Database, project_task_id: int) -> None:
+        with db.conn.cursor() as cursor:
+            try:
+                cursor.execute("""
+                        UPDATE project_task
+                        SET status = 'завершён'
+                        WHERE id = %s
+                        RETURNING id
+                    """, (project_task_id,))
+                db.conn.commit()
+            except Exception as e:
+                db.conn.rollback()
+                raise Exception(f"Ошибка при завершении задачи: {e}")
+
+    @staticmethod
+    def update_task_status(db: Database, project_task_id: int, status: str) -> None:
+        with db.conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE project_task
+                SET status = %s
+                WHERE id = %s
+            """, (status, project_task_id))
+            db.conn.commit()
+
+    @staticmethod
+    def complete_stage_tasks(db: Database, project_id: int, stage: Optional[str]) -> None:
+        with db.conn.cursor() as cursor:
+            try:
+                if stage is None:
+                    cursor.execute("""
+                            UPDATE project_task pt
+                            SET status = 'завершён'
+                            FROM task t
+                            WHERE pt.task_id = t.id
+                            AND pt.project_id = %s
+                            AND t.stage IS NULL
+                            AND pt.status != 'завершён'
+                        """, (project_id,))
+                else:
+                    cursor.execute("""
+                            UPDATE project_task pt
+                            SET status = 'завершён'
+                            FROM task t
+                            WHERE pt.task_id = t.id
+                            AND pt.project_id = %s
+                            AND t.stage = %s
+                            AND pt.status != 'завершён'
+                        """, (project_id, stage))
+                db.conn.commit()
+            except Exception as e:
+                db.conn.rollback()
+                raise Exception(f"Ошибка при завершении задач этапа: {e}")
+
+    @staticmethod
+    def incomplete_stage_tasks(db: Database, project_id: int, stage: Optional[str]) -> None:
+        with db.conn.cursor() as cursor:
+            if stage is None:
+                cursor.execute("""
+                    UPDATE project_task pt
+                    SET status = 'в процессе'
+                    FROM task t
+                    WHERE pt.task_id = t.id
+                    AND pt.project_id = %s
+                    AND t.stage IS NULL
+                """, (project_id,))
+            else:
+                cursor.execute("""
+                    UPDATE project_task pt
+                    SET status = 'в процессе'
+                    FROM task t
+                    WHERE pt.task_id = t.id
+                    AND pt.project_id = %s
+                    AND t.stage = %s
+                """, (project_id, stage))
+            db.conn.commit()
+
+    @staticmethod
+    def update_project_status(db: Database, project_id: int, new_status: str) -> None:
+        with db.conn.cursor() as cursor:
+            valid_statuses = [status.value for status in Status]
+            if new_status not in valid_statuses:
+                raise ValueError(f"Недопустимый статус проекта: {new_status}")
+
+            cursor.execute("""
+                UPDATE project
+                SET status = %s
+                WHERE id = %s
+            """, (new_status, project_id))
+
+            if new_status==Status.COMPLETED.value:
+                cursor.execute("""
+                    UPDATE project_task
+                    SET status = 'завершён'
+                    WHERE project_id = %s
+                    AND status != 'завершён'
+                """, (project_id,))
+
+            db.conn.commit()
+
+    @staticmethod
+    def get_project_stages(db: Database, project_id: int) -> List[str]:
+        with db.conn.cursor() as cursor:
+            cursor.execute("""
+                    SELECT DISTINCT t.stage
+                    FROM project_task pt
+                    JOIN task t ON pt.task_id = t.id
+                    WHERE pt.project_id = %s
+                    AND t.stage IS NOT NULL
+                """, (project_id,))
+            return [row[0] for row in cursor.fetchall()]
