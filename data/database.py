@@ -83,7 +83,7 @@ class Database:
             CREATE TABLE IF NOT EXISTS position (
                 id SERIAL PRIMARY KEY,
                 name TEXT NOT NULL,
-                department TEXT NOT NULL CHECK (department IN ('шрифтовой', 'технический', 'графический')),
+                department TEXT NOT NULL CHECK (department IN ('шрифтовой', 'технический', 'графический', 'контентный')),
                 UNIQUE (name, department)
             );
         """)
@@ -97,6 +97,39 @@ class Database:
                 status TEXT NOT NULL DEFAULT 'в работе' CHECK (status IN ('в работе', 'завершён', 'на паузе', 'отменен'))
             );
         """)
+
+        # Таблица для хранения истории изменений статуса проекта
+        cursor.execute("""
+               CREATE TABLE IF NOT EXISTS project_status_history (
+                   id SERIAL PRIMARY KEY,
+                   project_id INTEGER NOT NULL REFERENCES project(id),
+                   old_status TEXT NOT NULL,
+                   changed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+               );
+           """)
+
+        # Триггерная функция для логирования изменений статуса
+        cursor.execute("""
+               CREATE OR REPLACE FUNCTION log_project_status_change()
+               RETURNS TRIGGER AS $$
+               BEGIN
+                   IF NEW.status <> OLD.status THEN
+                       INSERT INTO project_status_history (project_id, old_status)
+                       VALUES (OLD.id, OLD.status);
+                   END IF;
+                   RETURN NEW;
+               END;
+               $$ LANGUAGE plpgsql;
+           """)
+
+        # Создание триггера
+        cursor.execute("""
+               DROP TRIGGER IF EXISTS project_status_change_trigger ON project;
+               CREATE TRIGGER project_status_change_trigger
+               AFTER UPDATE OF status ON project
+               FOR EACH ROW
+               EXECUTE FUNCTION log_project_status_change();
+           """)
 
         #Проекты для непроектных и кастомных задач
         cursor.execute("""

@@ -19,6 +19,7 @@ class Department(Enum):
     FONT = "шрифтовой"
     TECHNICAL = "технический"
     GRAPHIC = "графический"
+    CONTENT = "контентный"
 
 
 class Stage(Enum):

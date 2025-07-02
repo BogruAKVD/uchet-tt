@@ -68,7 +68,7 @@ async def add_time_button(message: types.Message, dialog_manager: DialogManager)
 
 @worker_router.message(F.text == "Экспортировать таблицу")
 async def add_time_button(message: types.Message, dialog_manager: DialogManager):
-    await dialog_manager.start(ExportTimeTableStates.processing)
+    await dialog_manager.start(ExportTimeTableStates.select_period)
 
 @worker_router.message(F.text == "Импортировать таблицу")
 async def add_time_button(message: types.Message, dialog_manager: DialogManager):
